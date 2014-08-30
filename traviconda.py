@@ -46,8 +46,8 @@ def setup_conda(url, channel=None):
     cmds =[['wget', '-nv', url, '-O', miniconda_file],
            ['chmod', '+x', miniconda_file],
            [p.join('.', miniconda_file), '-b', '-p', miniconda_dir],
-           [conda, 'update', '--yes', 'conda'],
-           [conda, 'install', '--yes', 'conda-build', 'jinja2', 'binstar']]
+           [conda, 'update', '-q', '--yes', 'conda'],
+           [conda, 'install', '-q', '--yes', 'conda-build', 'jinja2', 'binstar']]
     if channel is not None:
         cmds.append([conda, 'config', '--add', 'channels', channel])
     run_commands(*cmds)
@@ -67,7 +67,7 @@ def replace_text_in_file(path, placeholder, replacement):
 
 
 def build(path):
-    run_commands([conda, 'build', path])
+    run_commands([conda, 'build', '-q', path])
 
 
 def get_conda_build_path(path):
