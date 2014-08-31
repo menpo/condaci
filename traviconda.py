@@ -7,6 +7,7 @@ import platform as stdplatform
 
 platform = stdplatform.system()
 
+
 def detect_arch():
     arch = stdplatform.architecture()[0]
 
@@ -39,8 +40,8 @@ else:
     miniconda_installer_path = p.expanduser('~/miniconda.sh')
     miniconda_dir = p.expanduser('~/miniconda')
 
-print('miniconda_installer_path is {}'.format(miniconda_installer_path))
-print('miniconda will be installed to {}'.format(miniconda_dir))
+#print('miniconda_installer_path is {}'.format(miniconda_installer_path))
+#print('miniconda will be installed to {}'.format(miniconda_dir))
 
 miniconda_script_dir = p.join(miniconda_dir, script_dir_name)
 conda = p.join(miniconda_script_dir, 'conda')
@@ -49,7 +50,6 @@ python = 'python'
 
 
 def url_for_platform_version(platform, py_version, arch):
-
     version = '3.6.0'
     base_url = 'http://repo.continuum.io/miniconda/Miniconda'
     platform_str = {'Linux': 'Linux',
