@@ -27,7 +27,7 @@ def detect_arch():
 
 arch = detect_arch()
 
-print('running on {} {}'.format(platform, arch))
+#print('running on {} {}'.format(platform, arch))
 
 
 # define our commands
