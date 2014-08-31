@@ -3,6 +3,7 @@ import subprocess
 import os
 import os.path as p
 from functools import partial
+import platform
 
 miniconda_dir = p.expanduser('~/miniconda')
 
@@ -15,6 +16,7 @@ else:
     script_dir_name = 'bin'
     miniconda_installer_path = p.expanduser('~/miniconda.sh')
 
+print('miniconda_installer_path is {}'.format(miniconda_installer_path))
 
 miniconda_script_dir = p.join(miniconda_dir, script_dir_name)
 conda = p.join(miniconda_script_dir, 'conda')
@@ -26,14 +28,14 @@ def url_for_platform_version(platform, py_version, arch):
 
     version = '3.6.0'
     base_url = 'http://repo.continuum.io/miniconda/Miniconda'
-    platform_str = {'linux': 'Linux',
-                    'darwin': 'MacOSX',
-                    'win32': 'Windows'}
+    platform_str = {'Linux': 'Linux',
+                    'Darwin': 'MacOSX',
+                    'Windows': 'Windows'}
     arch_str = {'64': 'x86_64',
                 '32': 'x86'}
-    ext = {'linux': '.sh',
-           'darwin': '.sh',
-           'win32': '.exe'}
+    ext = {'Linux': '.sh',
+           'Darwin': '.sh',
+           'Windows': '.exe'}
 
     if py_version == '3':
         base_url = base_url + py_version
@@ -88,16 +90,10 @@ def install_miniconda(path_to_installer, path_to_install):
     execute([path_to_installer, '-b', '-p', path_to_install])
 
 
-def os_identifier():
-    if sys.platform.startswith('linux'):
-        return 'linux'
-    return sys.platform
-
-
 def setup_miniconda(python_version, channel=None):
-    url = url_for_platform_version(os_identifier(), python_version, '64')
+    url = url_for_platform_version(platform.system(), python_version, '64')
     print('Setting up miniconda from URL {}'.format(url))
-    # acquire_miniconda(url, miniconda_installer_path)
+    acquire_miniconda(url, miniconda_installer_path)
     # install_miniconda(miniconda_installer_path, miniconda_dir)
     # cmds = [[conda, 'update', '-q', '--yes', 'conda'],
     #         [conda, 'install', '-q', '--yes', 'conda-build', 'jinja2',
