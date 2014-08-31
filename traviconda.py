@@ -12,9 +12,9 @@ platform = stdplatform.system()
 # http://stackoverflow.com/questions/2208828/detect-64bit-os-windows-in-python
 if platform == 'Windows':
     if 'PROGRAMFILES(X86)' in os.environ:
-        arch = '64bits'
+        arch = '64bit'
     else:
-        arch = '32bits'
+        arch = '32bit'
 
 print('running on {} {}'.format(platform, arch))
 
