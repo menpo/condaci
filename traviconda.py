@@ -179,13 +179,18 @@ def resolve_channel_from_travis_state():
         return branch
 
 
+def version_from_git_tags():
+    return subprocess.check_output(
+        ['git', 'describe', '--tags'])[1:].replace('-', '_')
+
+
 if __name__ == "__main__":
     from argparse import ArgumentParser
     parser = ArgumentParser(
         description=r"""
         Sets up miniconda, builds, and uploads to binstar on Travis CI.
         """)
-    parser.add_argument("mode", choices=['setup', 'build'])
+    parser.add_argument("mode", choices=['setup', 'build', 'version'])
     parser.add_argument("--python", choices=['2', '3'])
     parser.add_argument("-c", "--channel", help="binstar channel to activate "
                                                 "(setup only, optional)")
@@ -202,3 +207,6 @@ if __name__ == "__main__":
         setup_miniconda(ns.python, channel=ns.channel)
     elif ns.mode == 'build':
         build_and_upload(ns.path, user=ns.user, key=ns.key)
+    else:
+        print(version_from_git_tags())
+
