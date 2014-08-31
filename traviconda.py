@@ -38,11 +38,11 @@ miniconda_dir = p.expanduser('~/miniconda')
 import sys
 # define our commands
 if sys.platform == 'win32':
-    script_dir_name = 'bin'
-    miniconda_installer_path = p.expanduser('~/miniconda.sh')
-else:
     script_dir_name = 'Scripts'
     miniconda_installer_path = p.expanduser('~/miniconda.exe')
+else:
+    script_dir_name = 'bin'
+    miniconda_installer_path = p.expanduser('~/miniconda.sh')
 
 
 miniconda_script_dir = p.join(miniconda_dir, script_dir_name)
