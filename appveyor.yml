@@ -14,10 +14,6 @@ platform:
     - x86
     - x64
 
-branches:
-    - master
-    - beta
-
 install:
     - python traviconda.py setup --python 3
 
