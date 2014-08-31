@@ -17,11 +17,15 @@ else:
     miniconda_installer_path = p.expanduser('~/miniconda.sh')
 
 print('miniconda_installer_path is {}'.format(miniconda_installer_path))
+print('miniconda will be installed to {}'.format(miniconda_dir))
 
 miniconda_script_dir = p.join(miniconda_dir, script_dir_name)
 conda = p.join(miniconda_script_dir, 'conda')
 binstar = p.join(miniconda_script_dir, 'binstar')
 python = 'python'
+
+import platform
+current_platform = platform.system()
 
 
 def url_for_platform_version(platform, py_version, arch):
@@ -84,17 +88,19 @@ def acquire_miniconda(url, path_to_download):
 
 
 def install_miniconda(path_to_installer, path_to_install):
-    # TODO add windows
     print('Installing miniconda to {}'.format(path_to_install))
-    execute(['chmod', '+x', path_to_installer])
-    execute([path_to_installer, '-b', '-p', path_to_install])
+    if current_platform == 'Windows':
+        execute([path_to_installer, '/S', '/D={}'.format(path_to_install)])
+    else:
+        execute(['chmod', '+x', path_to_installer])
+        execute([path_to_installer, '-b', '-p', path_to_install])
 
 
 def setup_miniconda(python_version, channel=None):
     url = url_for_platform_version(platform.system(), python_version, '64')
     print('Setting up miniconda from URL {}'.format(url))
     acquire_miniconda(url, miniconda_installer_path)
-    # install_miniconda(miniconda_installer_path, miniconda_dir)
+    install_miniconda(miniconda_installer_path, miniconda_dir)
     # cmds = [[conda, 'update', '-q', '--yes', 'conda'],
     #         [conda, 'install', '-q', '--yes', 'conda-build', 'jinja2',
     #          'binstar']]
