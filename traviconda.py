@@ -35,21 +35,42 @@ def execute_sequence(*cmds, **kwargs):
 
 miniconda_dir = p.expanduser('~/miniconda')
 
+import sys
 # define our commands
-miniconda_bin_dir = p.join(miniconda_dir, 'bin')
-conda = p.join(miniconda_bin_dir, 'conda')
-binstar = p.join(miniconda_bin_dir, 'binstar')
+if sys.platform == 'win32':
+    script_dir_name = 'bin'
+    miniconda_installer_path = p.expanduser('~/miniconda.sh')
+else:
+    script_dir_name = 'Scripts'
+    miniconda_installer_path = p.expanduser('~/miniconda.exe')
+
+
+miniconda_script_dir = p.join(miniconda_dir, script_dir_name)
+conda = p.join(miniconda_script_dir, 'conda')
+binstar = p.join(miniconda_script_dir, 'binstar')
 python = 'python'
+
+
+def acquire_miniconda(url, path_to_download):
+    # TODO add windows
+    print('downloading miniconda from {} to {}'.format(url, path_to_download))
+    execute(['wget', '-nv', url, '-O', path_to_download])
+
+
+def install_miniconda(path_to_installer, path_to_install):
+    # TODO add windows
+    print('installing miniconda to {}'.format(path_to_install))
+    execute(['chmod', '+x', path_to_installer])
+    execute([path_to_installer, '-b', '-p', path_to_install])
 
 
 def setup_miniconda(url, channel=None):
     print('Setting up miniconda from URL {}'.format(ns.path))
-    miniconda_file = 'miniconda.sh'
-    # TODO download with Python so we work on Windows.
-    cmds =[['wget', '-nv', url, '-O', miniconda_file],
-           [python, miniconda_file, '-b', '-p', miniconda_dir],
-           [conda, 'update', '-q', '--yes', 'conda'],
-           [conda, 'install', '-q', '--yes', 'conda-build', 'jinja2', 'binstar']]
+    acquire_miniconda(url, miniconda_installer_path)
+    install_miniconda(miniconda_installer_path, miniconda_dir)
+    cmds =[[conda, 'update', '-q', '--yes', 'conda'],
+           [conda, 'install', '-q', '--yes', 'conda-build', 'jinja2',
+            'binstar']]
     if channel is not None:
         print("(adding channel '{}' for dependencies)".format(channel))
         cmds.append([conda, 'config', '--add', 'channels', channel])
