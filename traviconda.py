@@ -77,9 +77,7 @@ def download_file(url, path_to_download):
 
 
 def acquire_miniconda(url, path_to_download):
-    # TODO add windows
     print('Downloading miniconda from {} to {}'.format(url, path_to_download))
-    # execute(['wget', '-nv', url, '-O', path_to_download])
     download_file(url, path_to_download)
 
 
