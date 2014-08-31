@@ -49,6 +49,7 @@ miniconda_script_dir = p.join(miniconda_dir, script_dir_name)
 conda = p.join(miniconda_script_dir, 'conda')
 binstar = p.join(miniconda_script_dir, 'binstar')
 python = 'python'
+print(conda)
 
 
 def acquire_miniconda(url, path_to_download):
@@ -65,12 +66,12 @@ def install_miniconda(path_to_installer, path_to_install):
 
 
 def setup_miniconda(url, channel=None):
-    print('Setting up miniconda from URL {}'.format(ns.path))
+    print('Setting up miniconda from URL {}'.format(url))
     acquire_miniconda(url, miniconda_installer_path)
     install_miniconda(miniconda_installer_path, miniconda_dir)
-    cmds =[[conda, 'update', '-q', '--yes', 'conda'],
-           [conda, 'install', '-q', '--yes', 'conda-build', 'jinja2',
-            'binstar']]
+    cmds = [[conda, 'update', '-q', '--yes', 'conda'],
+            [conda, 'install', '-q', '--yes', 'conda-build', 'jinja2',
+             'binstar']]
     if channel is not None:
         print("(adding channel '{}' for dependencies)".format(channel))
         cmds.append([conda, 'config', '--add', 'channels', channel])
