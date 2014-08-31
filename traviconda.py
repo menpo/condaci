@@ -5,12 +5,13 @@ import os.path as p
 from functools import partial
 import platform
 
-import platform
-current_platform = platform.system()
+platform_ = platform.system()
+arch = platform.architecture()[0]
+print('running on {} {}'.format(platform_, arch))
 
 
 # define our commands
-if current_platform == 'Windows':
+if platform_ == 'Windows':
     script_dir_name = 'Scripts'
     miniconda_installer_path = 'C:\miniconda.exe'
     miniconda_dir = p.expanduser('C:\Miniconda')
@@ -35,8 +36,8 @@ def url_for_platform_version(platform, py_version, arch):
     platform_str = {'Linux': 'Linux',
                     'Darwin': 'MacOSX',
                     'Windows': 'Windows'}
-    arch_str = {'64': 'x86_64',
-                '32': 'x86'}
+    arch_str = {'64bit': 'x86_64',
+                '32bit': 'x86'}
     ext = {'Linux': '.sh',
            'Darwin': '.sh',
            'Windows': '.exe'}
@@ -89,7 +90,7 @@ def acquire_miniconda(url, path_to_download):
 
 def install_miniconda(path_to_installer, path_to_install):
     print('Installing miniconda to {}'.format(path_to_install))
-    if current_platform == 'Windows':
+    if platform_ == 'Windows':
         execute([path_to_installer, '/S', '/D={}'.format(path_to_install)])
     else:
         execute(['chmod', '+x', path_to_installer])
@@ -97,7 +98,7 @@ def install_miniconda(path_to_installer, path_to_install):
 
 
 def setup_miniconda(python_version, channel=None):
-    url = url_for_platform_version(platform.system(), python_version, '64')
+    url = url_for_platform_version(platform_, python_version, arch)
     print('Setting up miniconda from URL {}'.format(url))
     acquire_miniconda(url, miniconda_installer_path)
     install_miniconda(miniconda_installer_path, miniconda_dir)
