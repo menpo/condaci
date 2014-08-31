@@ -4,6 +4,23 @@ import os
 import os.path as p
 from functools import partial
 
+miniconda_dir = p.expanduser('~/miniconda')
+
+import sys
+# define our commands
+if sys.platform == 'win32':
+    script_dir_name = 'Scripts'
+    miniconda_installer_path = p.expanduser('~/miniconda.exe')
+else:
+    script_dir_name = 'bin'
+    miniconda_installer_path = p.expanduser('~/miniconda.sh')
+
+
+miniconda_script_dir = p.join(miniconda_dir, script_dir_name)
+conda = p.join(miniconda_script_dir, 'conda')
+binstar = p.join(miniconda_script_dir, 'binstar')
+python = 'python'
+
 
 def url_for_platform_version(platform, py_version, arch):
 
@@ -15,8 +32,8 @@ def url_for_platform_version(platform, py_version, arch):
     arch_str = {'64': 'x86_64',
                 '32': 'x86'}
     ext = {'linux': '.sh',
-           'osx': '.sh',
-           'windows': '.exe'}
+           'darwin': '.sh',
+           'win32': '.exe'}
 
     if py_version == '3':
         base_url = base_url + py_version
@@ -52,28 +69,19 @@ def execute_sequence(*cmds, **kwargs):
         raise e
 
 
-miniconda_dir = p.expanduser('~/miniconda')
-
-import sys
-# define our commands
-if sys.platform == 'win32':
-    script_dir_name = 'Scripts'
-    miniconda_installer_path = p.expanduser('~/miniconda.exe')
-else:
-    script_dir_name = 'bin'
-    miniconda_installer_path = p.expanduser('~/miniconda.sh')
-
-
-miniconda_script_dir = p.join(miniconda_dir, script_dir_name)
-conda = p.join(miniconda_script_dir, 'conda')
-binstar = p.join(miniconda_script_dir, 'binstar')
-python = 'python'
+def download_file(url, path_to_download):
+    import urllib2
+    with urllib2.urlopen(url) as f:
+        downloaded_file = f.read()
+    with open(path_to_download, 'wb') as f:
+        f.write(downloaded_file)
 
 
 def acquire_miniconda(url, path_to_download):
     # TODO add windows
     print('Downloading miniconda from {} to {}'.format(url, path_to_download))
-    execute(['wget', '-nv', url, '-O', path_to_download])
+    # execute(['wget', '-nv', url, '-O', path_to_download])
+    download_file(url, path_to_download)
 
 
 def install_miniconda(path_to_installer, path_to_install):
