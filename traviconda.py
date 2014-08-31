@@ -181,7 +181,7 @@ def resolve_channel_from_travis_state():
 
 def version_from_git_tags():
     return subprocess.check_output(
-        ['git', 'describe', '--tags'])[1:].replace('-', '_')
+        ['git', 'describe', '--tags']).strip()[1:].replace('-', '_')
 
 
 if __name__ == "__main__":
@@ -209,4 +209,3 @@ if __name__ == "__main__":
         build_and_upload(ns.path, user=ns.user, key=ns.key)
     else:
         print(version_from_git_tags())
-
