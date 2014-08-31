@@ -101,16 +101,16 @@ def setup_miniconda(python_version, channel=None):
     print('Setting up miniconda from URL {}'.format(url))
     acquire_miniconda(url, miniconda_installer_path)
     install_miniconda(miniconda_installer_path, miniconda_dir)
-    # cmds = [[conda, 'update', '-q', '--yes', 'conda'],
-    #         [conda, 'install', '-q', '--yes', 'conda-build', 'jinja2',
-    #          'binstar']]
-    # if channel is not None:
-    #     print("(adding channel '{}' for dependencies)".format(channel))
-    #     cmds.append([conda, 'config', '--add', 'channels', channel])
-    # else:
-    #     print("No channels have been configured (all dependencies have to be "
-    #           "sourced from anaconda)")
-    # execute_sequence(*cmds)
+    cmds = [[conda, 'update', '-q', '--yes', 'conda'],
+            [conda, 'install', '-q', '--yes', 'conda-build', 'jinja2',
+             'binstar']]
+    if channel is not None:
+        print("(adding channel '{}' for dependencies)".format(channel))
+        cmds.append([conda, 'config', '--add', 'channels', channel])
+    else:
+        print("No channels have been configured (all dependencies have to be "
+              "sourced from anaconda)")
+    execute_sequence(*cmds)
 
 
 def build(path):
