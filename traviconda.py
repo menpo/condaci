@@ -3,21 +3,24 @@ import subprocess
 import os
 import os.path as p
 from functools import partial
-import platform
-import struct
-is_64bit = struct.calcsize('P') * 8 == 64
+import platform as stdplatform
 
-if is_64bit:
-    arch = '64bit'
-else:
-    arch = '32bit'
+arch = stdplatform.architecture()[0]
+platform = stdplatform.system()
 
-platform_ = platform.system()
-print('running on {} {}'.format(platform_, arch))
+# need to be a little more sneaky to check the platform on Windows:
+# http://stackoverflow.com/questions/2208828/detect-64bit-os-windows-in-python
+if platform == 'Windows':
+    if 'PROGRAMFILES(X86)' in os.environ:
+        arch = '64bits'
+    else:
+        arch = '32bits'
+
+print('running on {} {}'.format(platform, arch))
 
 
 # define our commands
-if platform_ == 'Windows':
+if platform == 'Windows':
     script_dir_name = 'Scripts'
     miniconda_installer_path = 'C:\miniconda.exe'
     miniconda_dir = p.expanduser('C:\Miniconda')
@@ -96,7 +99,7 @@ def acquire_miniconda(url, path_to_download):
 
 def install_miniconda(path_to_installer, path_to_install):
     print('Installing miniconda to {}'.format(path_to_install))
-    if platform_ == 'Windows':
+    if platform == 'Windows':
         execute([path_to_installer, '/S', '/D={}'.format(path_to_install)])
     else:
         execute(['chmod', '+x', path_to_installer])
@@ -104,7 +107,7 @@ def install_miniconda(path_to_installer, path_to_install):
 
 
 def setup_miniconda(python_version, channel=None):
-    url = url_for_platform_version(platform_, python_version, arch)
+    url = url_for_platform_version(platform, python_version, arch)
     print('Setting up miniconda from URL {}'.format(url))
     acquire_miniconda(url, miniconda_installer_path)
     install_miniconda(miniconda_installer_path, miniconda_dir)
