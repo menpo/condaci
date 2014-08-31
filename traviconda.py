@@ -4,10 +4,6 @@ import os
 import os.path as p
 from functools import partial
 
-# the string that is in the meta.yaml file that will be replaced by the
-# tag-generated version number
-yaml_version_placeholder = 'VERSION_NUMBER'
-
 
 # forward stderr to stdout
 co = partial(subprocess.check_output, stderr=subprocess.STDOUT)
@@ -15,6 +11,8 @@ check = partial(subprocess.check_call, stderr=subprocess.STDOUT)
 
 
 def execute(cmd, verbose=False):
+    r""" Runs a command, printing the command and it's output to screen.
+    """
     if verbose:
         print('> {}'.format(' '.join(cmd)))
     result = co(cmd)
@@ -22,16 +20,10 @@ def execute(cmd, verbose=False):
         print(result)
     return result
 
-miniconda_dir = p.expanduser('~/miniconda')
 
-# define our commands
-mc_bin_dir = p.join(miniconda_dir, 'bin')
-conda = p.join(mc_bin_dir, 'conda')
-conda_build = p.join(mc_bin_dir, 'conda-build')
-binstar = p.join(mc_bin_dir, 'binstar')
-
-
-def run_commands(*cmds, **kwargs):
+def execute_sequence(*cmds, **kwargs):
+    r""" Execute a sequence of commands. If any fails, display an error.
+    """
     verbose = kwargs.get('verbose', True)
     try:
         for cmd in cmds:
@@ -41,33 +33,34 @@ def run_commands(*cmds, **kwargs):
         raise e
 
 
-def setup_conda(url, channel=None):
+miniconda_dir = p.expanduser('~/miniconda')
+
+# define our commands
+miniconda_bin_dir = p.join(miniconda_dir, 'bin')
+conda = p.join(miniconda_bin_dir, 'conda')
+binstar = p.join(miniconda_bin_dir, 'binstar')
+python = 'python'
+
+
+def setup_miniconda(url, channel=None):
+    print('Setting up miniconda from URL {}'.format(ns.path))
     miniconda_file = 'miniconda.sh'
+    # TODO download with Python so we work on Windows.
     cmds =[['wget', '-nv', url, '-O', miniconda_file],
-           ['chmod', '+x', miniconda_file],
-           [p.join('.', miniconda_file), '-b', '-p', miniconda_dir],
+           [python, miniconda_file, '-b', '-p', miniconda_dir],
            [conda, 'update', '-q', '--yes', 'conda'],
            [conda, 'install', '-q', '--yes', 'conda-build', 'jinja2', 'binstar']]
     if channel is not None:
+        print("(adding channel '{}' for dependencies)".format(channel))
         cmds.append([conda, 'config', '--add', 'channels', channel])
-    run_commands(*cmds)
-
-
-def get_version():
-    raw_describe = execute(['git', 'describe', '--tag'], verbose=True)
-    # conda does not like '-' in version strings
-    return raw_describe.strip().replace('-', '_')[1:]
-
-
-def replace_text_in_file(path, placeholder, replacement):
-    with open(path, 'rb') as f:
-        meta = f.read()
-    with open(path, 'wb') as f:
-        f.write(meta.replace(placeholder, replacement))
+    else:
+        print("No channels have been configured (all dependencies have to be "
+              "sourceble from anaconda)")
+    execute_sequence(*cmds)
 
 
 def build(path):
-    run_commands([conda, 'build', '-q', path])
+    execute_sequence([conda, 'build', '-q', path])
 
 
 def get_conda_build_path(path):
@@ -76,29 +69,35 @@ def get_conda_build_path(path):
     return bldpkg_path(MetaData(path))
 
 
-def upload_to_binstar(key, user, channel, path):
-    # check only as we don't want to print our key to Travis!
+def binstar_upload(key, user, channel, path):
     try:
-        check([binstar, '-t', key, 'upload', '-u', user, '-c', channel, path])
+        # TODO - could this safely be co? then we would get the binstar error..
+        check([binstar, '-t', key, 'upload',
+               '--force', '-u', user, '-c', channel, path])
     except subprocess.CalledProcessError as e:
-        # mask the binstar key
+        # mask the binstar key...
         cmd = e.cmd
         cmd[2] = 'BINSTAR_KEY'
+        # ...then raise the error
         raise subprocess.CalledProcessError(e.returncode, cmd)
 
 
-def upload(path, key, user, channel):
-    # get a handle on the conda output
-    built_tar = get_conda_build_path(path)
-    upload_to_binstar(key, user, channel, built_tar)
-
-
-def setup_and_find_version(url, build_dir, channel=None):
-    setup_conda(url, channel=channel)
-
-    # update the yaml file to have the verion number
-    replace_text_in_file(p.join(build_dir, 'meta.yaml'),
-                         yaml_version_placeholder, get_version())
+def build_and_upload(path, user=None, key=None):
+    print('Building package at path {}'.format(ns.path))
+    # actually issue conda build
+    build(path)
+    if key is None:
+        print('No binstar key provided')
+    if user is None:
+        print('No binstar user provided')
+    if user is None or key is None:
+        print('-> Unable to upload to binstar')
+        return
+    # decide if we should attempt an upload
+    if resolve_can_upload_from_travis():
+        channel = resolve_channel_from_travis_state()
+        print('Uploading to {}/{}'.format(user, channel))
+        binstar_upload(key, user, channel, get_conda_build_path(path))
 
 
 def resolve_can_upload_from_travis():
@@ -118,8 +117,8 @@ def resolve_channel_from_travis_state():
         print("on a tagged release -> upload to 'main'")
         return 'main'
     else:
-        print("not on a tag on master - just upload to the branch name {"
-              "}".format(branch))
+        print("not on a tag on master - "
+              "just upload to the branch name {}".format(branch))
         return branch
 
 
@@ -127,33 +126,27 @@ if __name__ == "__main__":
     from argparse import ArgumentParser
     parser = ArgumentParser(
         description=r"""
-        Setup conda, version meta.yaml, and upload to binstar on Travis CI.
+        Sets up miniconda, builds, and uploads to binstar on Travis CI.
         """)
     parser.add_argument("mode", choices=['setup', 'build'])
-    parser.add_argument("path", help="path to the conda build scripts")
-    parser.add_argument("--url", help="URL to download miniconda from")
+    parser.add_argument("--url", help="URL to download miniconda from "
+                                      "(setup only, required)")
     parser.add_argument("-c", "--channel", help="binstar channel to activate "
-                                                "(setup only)")
+                                                "(setup only, optional)")
+    parser.add_argument("--path", "-p", help="path to the conda build "
+                                             "scripts (build only, required)")
     parser.add_argument("-u", "--user", help="binstar user to upload to "
-                                             "(build only)")
-    parser.add_argument("-k", "--key", help="The binstar key for uploading")
+                                             "(build only, required to "
+                                             "upload)")
+    parser.add_argument("-k", "--key", help="The binstar key for uploading ("
+                                            "build only, required to upload)")
     ns = parser.parse_args()
 
     if ns.mode == 'setup':
-        print('Setting up package at path {}'.format(ns.path))
         url = ns.url
         if url is None:
             raise ValueError("You must provide a miniconda URL for the "
                              "setup command")
-        setup_and_find_version(url, ns.path, channel=ns.channel)
+        setup_miniconda(url, channel=ns.channel)
     elif ns.mode == 'build':
-        print('Building package at path {}'.format(ns.path))
-        key = ns.key
-        if key is None:
-            raise ValueError("You must provide a key for the build script.")
-        build(ns.path)
-        upload_allowed = resolve_can_upload_from_travis()
-        if upload_allowed:
-            channel = resolve_channel_from_travis_state()
-            print('Uploading to {}/{}'.format(ns.user, channel))
-            upload(ns.path, key, ns.user, channel)
+        build_and_upload(ns.path, user=ns.user, key=ns.key)
