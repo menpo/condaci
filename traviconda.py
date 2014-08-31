@@ -49,18 +49,17 @@ miniconda_script_dir = p.join(miniconda_dir, script_dir_name)
 conda = p.join(miniconda_script_dir, 'conda')
 binstar = p.join(miniconda_script_dir, 'binstar')
 python = 'python'
-print(conda)
 
 
 def acquire_miniconda(url, path_to_download):
     # TODO add windows
-    print('downloading miniconda from {} to {}'.format(url, path_to_download))
+    print('Downloading miniconda from {} to {}'.format(url, path_to_download))
     execute(['wget', '-nv', url, '-O', path_to_download])
 
 
 def install_miniconda(path_to_installer, path_to_install):
     # TODO add windows
-    print('installing miniconda to {}'.format(path_to_install))
+    print('Installing miniconda to {}'.format(path_to_install))
     execute(['chmod', '+x', path_to_installer])
     execute([path_to_installer, '-b', '-p', path_to_install])
 
