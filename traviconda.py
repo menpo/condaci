@@ -5,15 +5,26 @@ import os.path as p
 from functools import partial
 import platform as stdplatform
 
-arch = stdplatform.architecture()[0]
 platform = stdplatform.system()
 
-# need to be a little more sneaky to check the platform on Windows:
-# http://stackoverflow.com/questions/2208828/detect-64bit-os-windows-in-python
-if platform == 'Windows':
-    if 'APPVEYOR' in os.environ:
-        print("Running on AppVeyor, can check arch directly")
-        print(os.environ['PLATFORM'])
+def detect_arch():
+    arch = stdplatform.architecture()[0]
+
+    # need to be a little more sneaky to check the platform on Windows:
+    # http://stackoverflow.com/questions/2208828/detect-64bit-os-windows-in-python
+    if platform == 'Windows':
+        if 'APPVEYOR' in os.environ:
+            print("Running on AppVeyor, can check arch directly")
+            av_platform = os.environ['PLATFORM']
+            if av_platform == 'x86':
+                arch = '32bit'
+            elif av_platform == 'x64':
+                arch = '64bit'
+            else:
+                print('Was unable to interpret the platform "{}"'.format())
+    return arch
+
+arch = detect_arch()
 
 print('running on {} {}'.format(platform, arch))
 
