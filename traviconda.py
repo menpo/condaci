@@ -170,8 +170,6 @@ if __name__ == "__main__":
         Sets up miniconda, builds, and uploads to binstar on Travis CI.
         """)
     parser.add_argument("mode", choices=['setup', 'build'])
-    parser.add_argument("--url", help="URL to download miniconda from "
-                                      "(setup only, required)")
     parser.add_argument("--python", choices=['2', '3'])
     parser.add_argument("-c", "--channel", help="binstar channel to activate "
                                                 "(setup only, optional)")
@@ -185,10 +183,6 @@ if __name__ == "__main__":
     ns = parser.parse_args()
 
     if ns.mode == 'setup':
-        url = ns.url
-        if url is None:
-            raise ValueError("You must provide a miniconda URL for the "
-                             "setup command")
         setup_miniconda(ns.python, channel=ns.channel)
     elif ns.mode == 'build':
         build_and_upload(ns.path, user=ns.user, key=ns.key)
