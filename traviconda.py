@@ -4,9 +4,15 @@ import os
 import os.path as p
 from functools import partial
 import platform
+import struct
+is_64bit = struct.calcsize('P') * 8 == 64
+
+if is_64bit:
+    arch = '64bit'
+else:
+    arch = '32bit'
 
 platform_ = platform.system()
-arch = platform.architecture()[0]
 print('running on {} {}'.format(platform_, arch))
 
 
