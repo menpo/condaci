@@ -10,8 +10,8 @@ def url_for_platform_version(platform, py_version, arch):
     version = '3.6.0'
     base_url = 'http://repo.continuum.io/miniconda/Miniconda'
     platform_str = {'linux': 'Linux',
-                    'osx': 'MacOSX',
-                    'windows': 'Windows'}
+                    'darwin': 'MacOSX',
+                    'win32': 'Windows'}
     arch_str = {'64': 'x86_64',
                 '32': 'x86'}
     ext = {'linux': '.sh',
@@ -83,8 +83,20 @@ def install_miniconda(path_to_installer, path_to_install):
     execute([path_to_installer, '-b', '-p', path_to_install])
 
 
+def os_identifier():
+    if sys.platform.startswith('linux'):
+        return 'linux'
+    elif sys.platform == 'darwin':
+        return 'osx'
+    elif sys.platform == 'win32':
+        return 'windows'
+    else:
+        raise ValueError('cannot figure our what '
+                         'platform {} is'.format(sys.platform))
+
+
 def setup_miniconda(python_version, channel=None):
-    url = url_for_platform_version('linux', python_version, '64')
+    url = url_for_platform_version(os_identifier(), python_version, '64')
     print('Setting up miniconda from URL {}'.format(url))
     acquire_miniconda(url, miniconda_installer_path)
     install_miniconda(miniconda_installer_path, miniconda_dir)
