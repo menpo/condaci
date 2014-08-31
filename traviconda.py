@@ -10,12 +10,10 @@ platform = stdplatform.system()
 
 def detect_arch():
     arch = stdplatform.architecture()[0]
-
     # need to be a little more sneaky to check the platform on Windows:
     # http://stackoverflow.com/questions/2208828/detect-64bit-os-windows-in-python
     if platform == 'Windows':
         if 'APPVEYOR' in os.environ:
-            print("Running on AppVeyor, can check arch directly")
             av_platform = os.environ['PLATFORM']
             if av_platform == 'x86':
                 arch = '32bit'
@@ -27,9 +25,6 @@ def detect_arch():
 
 arch = detect_arch()
 
-#print('running on {} {}'.format(platform, arch))
-
-
 # define our commands
 if platform == 'Windows':
     script_dir_name = 'Scripts'
@@ -40,6 +35,8 @@ else:
     miniconda_installer_path = p.expanduser('~/miniconda.sh')
     miniconda_dir = p.expanduser('~/miniconda')
 
+# Amazingly, adding these causes conda-build to fail parsing yaml. :-|
+#print('running on {} {}'.format(platform, arch))
 #print('miniconda_installer_path is {}'.format(miniconda_installer_path))
 #print('miniconda will be installed to {}'.format(miniconda_dir))
 
