@@ -11,10 +11,9 @@ platform = stdplatform.system()
 # need to be a little more sneaky to check the platform on Windows:
 # http://stackoverflow.com/questions/2208828/detect-64bit-os-windows-in-python
 if platform == 'Windows':
-    if 'PROCESSOR_ARCHITEW6432' in os.environ:
-        arch = '64bit'
-    else:
-        arch = '32bit'
+    if 'APPVEYOR' in os.environ:
+        print("Running on AppVeyor, can check arch directly")
+        print(os.environ['PLATFORM'])
 
 print('running on {} {}'.format(platform, arch))
 
