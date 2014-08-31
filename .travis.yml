@@ -3,11 +3,11 @@ os:
 
 env:
   matrix:
-  - MINICONDA_URL=http://repo.continuum.io/miniconda/Miniconda-3.6.0-Linux-x86_64.sh
-  - MINICONDA_URL=http://repo.continuum.io/miniconda/Miniconda3-3.6.0-Linux-x86_64.sh
+  - PYTHON_VERSION=2
+  - PYTHON_VERSION=3
 
 script:
-- python traviconda.py setup --url $MINICONDA_URL
+- python traviconda.py setup --python PYTHON_VERSION
 - export PATH=/home/travis/miniconda/bin:$PATH
 
 notifications:

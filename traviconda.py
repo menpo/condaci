@@ -5,6 +5,25 @@ import os.path as p
 from functools import partial
 
 
+def url_for_platform_version(platform, py_version, arch):
+
+    version = '3.6.0'
+    base_url = 'http://repo.continuum.io/miniconda/Miniconda'
+    platform_str = {'linux': 'Linux',
+                    'osx': 'MacOSX',
+                    'windows': 'Windows'}
+    arch_str = {'64': 'x86_64',
+                '32': 'x86'}
+    ext = {'linux': '.sh',
+           'osx': '.sh',
+           'windows': '.exe'}
+
+    if py_version == '3':
+        base_url = base_url + py_version
+    return '-'.join([base_url, version,
+                     platform_str[platform],
+                     arch_str[arch]]) + ext[platform]
+
 # forward stderr to stdout
 co = partial(subprocess.check_output, stderr=subprocess.STDOUT)
 check = partial(subprocess.check_call, stderr=subprocess.STDOUT)
@@ -64,7 +83,8 @@ def install_miniconda(path_to_installer, path_to_install):
     execute([path_to_installer, '-b', '-p', path_to_install])
 
 
-def setup_miniconda(url, channel=None):
+def setup_miniconda(python_version, channel=None):
+    url = url_for_platform_version('linux', python_version, '64')
     print('Setting up miniconda from URL {}'.format(url))
     acquire_miniconda(url, miniconda_installer_path)
     install_miniconda(miniconda_installer_path, miniconda_dir)
@@ -152,9 +172,10 @@ if __name__ == "__main__":
     parser.add_argument("mode", choices=['setup', 'build'])
     parser.add_argument("--url", help="URL to download miniconda from "
                                       "(setup only, required)")
+    parser.add_argument("--python", choices=['2', '3'])
     parser.add_argument("-c", "--channel", help="binstar channel to activate "
                                                 "(setup only, optional)")
-    parser.add_argument("--path", "-p", help="path to the conda build "
+    parser.add_argument("--path", help="path to the conda build "
                                              "scripts (build only, required)")
     parser.add_argument("-u", "--user", help="binstar user to upload to "
                                              "(build only, required to "
@@ -168,6 +189,6 @@ if __name__ == "__main__":
         if url is None:
             raise ValueError("You must provide a miniconda URL for the "
                              "setup command")
-        setup_miniconda(url, channel=ns.channel)
+        setup_miniconda(ns.python, channel=ns.channel)
     elif ns.mode == 'build':
         build_and_upload(ns.path, user=ns.user, key=ns.key)
