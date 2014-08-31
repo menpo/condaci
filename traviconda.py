@@ -70,11 +70,13 @@ def execute_sequence(*cmds, **kwargs):
 
 
 def download_file(url, path_to_download):
-    import urllib2
-    with urllib2.urlopen(url) as f:
-        downloaded_file = f.read()
-    with open(path_to_download, 'wb') as f:
-        f.write(downloaded_file)
+    import urllib
+    urllib.urlretrieve(url, path_to_download)
+    # import urllib2
+    # with urllib2.urlopen(url) as f:
+    #     downloaded_file = f.read()
+    # with open(path_to_download, 'wb') as f:
+    #     f.write(downloaded_file)
 
 
 def acquire_miniconda(url, path_to_download):
