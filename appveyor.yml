@@ -15,7 +15,8 @@ platform:
     - x64
 
 install:
-    - python traviconda.py setup --python 3
+    - python traviconda.py version
+    - python traviconda.py setup --python 2
 
 #sartifacts:
   # Archive the generated wheel package in the ci.appveyor.com build report.
