@@ -86,13 +86,7 @@ def install_miniconda(path_to_installer, path_to_install):
 def os_identifier():
     if sys.platform.startswith('linux'):
         return 'linux'
-    elif sys.platform == 'darwin':
-        return 'osx'
-    elif sys.platform == 'win32':
-        return 'windows'
-    else:
-        raise ValueError('cannot figure our what '
-                         'platform {} is'.format(sys.platform))
+    return sys.platform
 
 
 def setup_miniconda(python_version, channel=None):
