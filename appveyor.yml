@@ -19,8 +19,8 @@ platform:
     - x64
 
 install:
-    - cmd: "python traviconda.py version"
-    - cmd: "python traviconda.py setup --python %PYTHON_VERSION%"
+    - python traviconda.py version
+    - python traviconda.py setup --python %PYTHON_VERSION%
 
 #sartifacts:
   # Archive the generated wheel package in the ci.appveyor.com build report.
