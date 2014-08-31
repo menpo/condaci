@@ -101,6 +101,7 @@ def setup_miniconda(python_version, channel=None):
     print('Setting up miniconda from URL {}'.format(url))
     acquire_miniconda(url, miniconda_installer_path)
     install_miniconda(miniconda_installer_path, miniconda_dir)
+    execute(['dir', p.expanduser('~')])
     cmds = [[conda, 'update', '-q', '--yes', 'conda'],
             [conda, 'install', '-q', '--yes', 'conda-build', 'jinja2',
              'binstar']]
