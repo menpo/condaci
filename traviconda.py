@@ -5,16 +5,19 @@ import os.path as p
 from functools import partial
 import platform
 
-miniconda_dir = p.expanduser('~/miniconda')
+import platform
+current_platform = platform.system()
 
-import sys
+
 # define our commands
-if sys.platform == 'win32':
+if current_platform == 'Windows':
     script_dir_name = 'Scripts'
-    miniconda_installer_path = p.expanduser('~/miniconda.exe')
+    miniconda_installer_path = 'C:\miniconda.exe'
+    miniconda_dir = p.expanduser('C:\Miniconda')
 else:
     script_dir_name = 'bin'
     miniconda_installer_path = p.expanduser('~/miniconda.sh')
+    miniconda_dir = p.expanduser('~/miniconda')
 
 print('miniconda_installer_path is {}'.format(miniconda_installer_path))
 print('miniconda will be installed to {}'.format(miniconda_dir))
@@ -23,9 +26,6 @@ miniconda_script_dir = p.join(miniconda_dir, script_dir_name)
 conda = p.join(miniconda_script_dir, 'conda')
 binstar = p.join(miniconda_script_dir, 'binstar')
 python = 'python'
-
-import platform
-current_platform = platform.system()
 
 
 def url_for_platform_version(platform, py_version, arch):
