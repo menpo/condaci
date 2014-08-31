@@ -112,7 +112,7 @@ def setup_miniconda(python_version, channel=None):
         cmds.append([conda, 'config', '--add', 'channels', channel])
     else:
         print("No channels have been configured (all dependencies have to be "
-              "sourceble from anaconda)")
+              "sourced from anaconda)")
     execute_sequence(*cmds)
 
 
