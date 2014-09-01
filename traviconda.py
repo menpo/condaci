@@ -236,10 +236,14 @@ def build_upload_and_purge(path, user=None, key=None):
     if user is None or key is None:
         print('-> Unable to upload to binstar')
         return
+    print('Have a user ({}) and key - can upload if suitable'.format(user))
     # decide if we should attempt an upload
     if resolve_can_upload_from_travis():
         channel = resolve_channel_from_travis_state()
+        print("Fit to upload to channel '{}'".format(channel))
         upload_and_purge(key, user, channel, get_conda_build_path(path))
+    else:
+        print("Cannot upload to binstar - must be a PR.")
 
 
 def upload_and_purge(key, user, channel, filepath):
