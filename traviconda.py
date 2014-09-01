@@ -129,20 +129,20 @@ def version_is_tag(version):
     return '_' not in version
 
 
-def all_files_on_channel(user, channel):
-    x = subprocess.check_output(['binstar', 'channel',
+def all_files_on_channel(key, user, channel):
+    x = subprocess.check_output([binstar, '-t', key, 'channel',
                                  '-o', user, '--show', channel])
     return [Binstar(*y[4:].replace('\\', '/').split('/')[1:])
             for y in x.split('\n')[1:-1]]
 
 
-def all_tagged_versions(user, channel):
-    return [x for x in all_files_on_channel(user, channel)
+def all_tagged_versions(key, user, channel):
+    return [x for x in all_files_on_channel(key, user, channel)
             if version_is_tag(x.version)]
 
 
-def all_non_tagged_versions(user, channel):
-    return [x for x in all_files_on_channel(user, channel)
+def all_non_tagged_versions(key, user, channel):
+    return [x for x in all_files_on_channel(key, user, channel)
             if not version_is_tag(x.version)]
 
 
@@ -152,20 +152,20 @@ def remove_all(b, to_purge):
         #b.remove_release(*x)
 
 
-def releases_to_remove(user, channel, filename):
+def releases_to_remove(key, user, channel, filename):
     name = name_from_filename(filename)
     version = version_from_filename(filename)
-    all_files = all_files_on_channel(user, channel)
+    all_files = all_files_on_channel(key, user, channel)
     files_of_self = [f for f in all_files if f.name == name]
     to_purge = set([(user, name, f.version) for f in files_of_self
                     if f.version != version and not version_is_tag(f.version)])
     return to_purge
 
 
-def purge_old_releases(b, user, channel, filename):
-    to_remove = releases_to_remove(user, channel, filename)
+def purge_old_releases(b, key, user, channel, filename):
+    to_remove = releases_to_remove(key, user, channel, filename)
     print("Found {} releases to remove: {}".format(len(to_remove), to_remove))
-    remove_all(b, releases_to_remove(user, channel, filename))
+    remove_all(b, releases_to_remove(key, user, channel, filename))
 
 
 # TRAVICONDA CONVIENIENCE FUNCTIONS
@@ -249,9 +249,11 @@ def build_upload_and_purge(path, user=None, key=None):
 def upload_and_purge(key, user, channel, filepath):
     print('Uploading to {}/{}'.format(user, channel))
     binstar_upload(key, user, channel, filepath)
+    print('Finished upload, now attempting to login.')
     filename = p.split(filepath)[-1]
     b = login_with_key(key)
-    purge_old_releases(b, user, channel, filename)
+    print('Logged in. Purging old releases...')
+    purge_old_releases(b, key, user, channel, filename)
 
 
 def resolve_can_upload_from_travis():
