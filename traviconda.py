@@ -8,21 +8,6 @@ import platform as stdplatform
 platform = stdplatform.system()
 
 
-def login():
-    from binstar_client.utils import get_binstar
-    return get_binstar()
-
-
-class LetMeIn:
-    def __init__(self, key):
-        self.token = key
-
-
-def login_with_key(key):
-    from binstar_client.utils import get_binstar
-    return get_binstar(args=LetMeIn(key))
-
-
 def detect_arch():
     arch = stdplatform.architecture()[0]
     # need to be a little more sneaky to check the platform on Windows:
@@ -112,6 +97,76 @@ def download_file(url, path_to_download):
     f = urllib2.urlopen(url)
     with open(path_to_download, "wb") as fp:
         fp.write(f.read())
+
+
+# BINSTAR  LOGIN
+
+def login():
+    from binstar_client.utils import get_binstar
+    return get_binstar()
+
+
+class LetMeIn:
+    def __init__(self, key):
+        self.token = key
+
+
+def login_with_key(key):
+    from binstar_client.utils import get_binstar
+    return get_binstar(args=LetMeIn(key))
+
+# BINSTAR FILE PURGING
+
+from collections import namedtuple
+
+Binstar = namedtuple('Binstar', ['name', 'version', 'platform', 'filename'])
+platform_from_filename = lambda fn: fn.split('-')[-1].split('.')[0]
+name_from_filename = lambda fn: fn.split('-')[0]
+version_from_filename = lambda fn: fn.split('-')[1]
+
+
+def version_is_tag(version):
+    return '_' not in version
+
+
+def all_files_on_channel(user, channel):
+    x = subprocess.check_output(['binstar', 'channel',
+                                 '-o', user, '--show', channel])
+    return [Binstar(*y[4:].replace('\\', '/').split('/')[1:])
+            for y in x.split('\n')[1:-1]]
+
+
+def all_tagged_versions(user, channel):
+    return [x for x in all_files_on_channel(user, channel)
+            if version_is_tag(x.version)]
+
+
+def all_non_tagged_versions(user, channel):
+    return [x for x in all_files_on_channel(user, channel)
+            if not version_is_tag(x.version)]
+
+
+def remove_all(b, to_purge):
+    for x in to_purge:
+        print('removing {}/{}/{}'.format(*x))
+        #b.remove_release(*x)
+
+
+def releases_to_remove(user, channel, filename):
+    name = name_from_filename(filename)
+    version = version_from_filename(filename)
+    all_files = all_files_on_channel(user, channel)
+    files_of_self = [f for f in all_files if f.name == name]
+    to_purge = set([(user, name, f.version) for f in files_of_self
+                    if f.version != version and not version_is_tag(f.version)])
+    return to_purge
+
+
+def purge_old_releases(b, user, channel, filename):
+    remove_all(b, releases_to_remove(user, channel, filename))
+
+
+# TRAVICONDA CONVIENIENCE FUNCTIONS
 
 
 def acquire_miniconda(url, path_to_download):
@@ -245,53 +300,3 @@ if __name__ == "__main__":
         build_upload_and_purge(ns.path, user=ns.user, key=ns.key)
     else:
         print(version_from_git_tags())
-
-# BINSTAR FILE PURGING
-
-from collections import namedtuple
-
-Binstar = namedtuple('Binstar', ['name', 'version', 'platform', 'filename'])
-platform_from_filename = lambda fn: fn.split('-')[-1].split('.')[0]
-name_from_filename = lambda fn: fn.split('-')[0]
-version_from_filename = lambda fn: fn.split('-')[1]
-
-
-def all_files_on_channel(user, channel):
-    x = subprocess.check_output(['binstar', 'channel',
-                                 '-o', user, '--show', channel])
-    return [Binstar(*y[4:].replace('\\', '/').split('/')[1:])
-            for y in x.split('\n')[1:-1]]
-
-
-def all_tagged_versions(user, channel):
-    return [x for x in all_files_on_channel(user, channel)
-            if version_is_tag(x.version)]
-
-
-def all_non_tagged_versions(user, channel):
-    return [x for x in all_files_on_channel(user, channel)
-            if not version_is_tag(x.version)]
-
-
-def remove_all(b, to_purge):
-    for x in to_purge:
-        print('removing {}/{}/{}'.format(*x))
-        #b.remove_release(*x)
-
-
-def version_is_tag(version):
-    return '_' not in version
-
-
-def releases_to_remove(user, channel, filename):
-    name = name_from_filename(filename)
-    version = version_from_filename(filename)
-    all_files = all_files_on_channel(user, channel)
-    files_of_self = [f for f in all_files if f.name == name]
-    to_purge = set([(user, name, f.version) for f in files_of_self
-                    if f.version != version and not version_is_tag(f.version)])
-    return to_purge
-
-
-def purge_old_releases(b, user, channel, filename):
-    remove_all(b, releases_to_remove(user, channel, filename))
