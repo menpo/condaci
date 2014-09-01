@@ -172,7 +172,7 @@ def build_and_upload(path, user=None, key=None):
 
 
 def resolve_can_upload_from_travis():
-    is_a_pr = os.environ['TRAVIS_PULL_REQUEST'] == 'true'
+    is_a_pr = os.environ['TRAVIS_PULL_REQUEST'] != 'false'
     can_upload = not is_a_pr
     print("Can we can upload? : {}".format(can_upload))
     return can_upload
