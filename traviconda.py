@@ -157,15 +157,16 @@ def releases_to_remove(key, user, channel, filename):
     version = version_from_filename(filename)
     all_files = all_files_on_channel(key, user, channel)
     files_of_self = [f for f in all_files if f.name == name]
-    to_purge = set([(user, name, f.version) for f in files_of_self
-                    if f.version != version and not version_is_tag(f.version)])
-    return to_purge
+    other_versions_of_self = [f for f in all_files
+                              if f.version != version and
+                              not version_is_tag(f.version)]
+    return other_versions_of_self
 
 
 def purge_old_releases(b, key, user, channel, filename):
     to_remove = releases_to_remove(key, user, channel, filename)
     print("Found {} releases to remove: {}".format(len(to_remove), to_remove))
-    remove_all(b, releases_to_remove(key, user, channel, filename))
+    remove_all(b, to_remove)
 
 
 # TRAVICONDA CONVIENIENCE FUNCTIONS
