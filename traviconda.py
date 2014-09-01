@@ -163,6 +163,8 @@ def releases_to_remove(user, channel, filename):
 
 
 def purge_old_releases(b, user, channel, filename):
+    to_remove = releases_to_remove(user, channel, filename)
+    print("Found {} releases to remove: {}".format(len(to_remove), to_remove))
     remove_all(b, releases_to_remove(user, channel, filename))
 
 
