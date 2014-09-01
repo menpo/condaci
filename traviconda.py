@@ -8,6 +8,21 @@ import platform as stdplatform
 platform = stdplatform.system()
 
 
+def login():
+    from binstar_client.utils import get_binstar
+    return get_binstar()
+
+
+class LetMeIn:
+    def __init__(self, key):
+        self.token = key
+
+
+def login_with_key(key):
+    from binstar_client.utils import get_binstar
+    return get_binstar(args=LetMeIn(key))
+
+
 def detect_arch():
     arch = stdplatform.architecture()[0]
     # need to be a little more sneaky to check the platform on Windows:
@@ -239,21 +254,6 @@ Binstar = namedtuple('Binstar', ['name', 'version', 'platform', 'filename'])
 platform_from_filename = lambda fn: fn.split('-')[-1].split('.')[0]
 name_from_filename = lambda fn: fn.split('-')[0]
 version_from_filename = lambda fn: fn.split('-')[1]
-
-
-def login():
-    from binstar_client.utils import get_binstar
-    return get_binstar()
-
-
-class LetMeIn:
-    def __init__(self, key):
-        self.token = key
-
-
-def login_with_key(key):
-    from binstar_client.utils import get_binstar
-    return get_binstar(args=LetMeIn(key))
 
 
 def all_files_on_channel(user, channel):
