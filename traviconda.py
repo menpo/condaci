@@ -333,15 +333,18 @@ if __name__ == "__main__":
         """)
     parser.add_argument("mode", choices=['setup', 'build', 'version'])
     parser.add_argument("--python", choices=['2', '3'])
-    parser.add_argument("-c", "--channel", help="binstar channel to activate "
-                                                "(setup only, optional)")
-    parser.add_argument("--path", help="path to the conda build "
-                                             "scripts (build only, required)")
-    parser.add_argument("-u", "--user", help="binstar user to upload to "
-                                             "(build only, required to "
-                                             "upload)")
-    parser.add_argument("-k", "--key", help="The binstar key for uploading ("
-                                            "build only, required to upload)")
+    parser.add_argument("-c", "--channel",
+                        help="binstar channel to activate "
+                             "(setup only, optional)")
+    parser.add_argument("--path",
+                        help="path to the conda build scripts "
+                             "(build only, required)")
+    parser.add_argument("-u", "--user",
+                        help="binstar user to upload to "
+                             "(build only, required to upload)")
+    parser.add_argument("-k", "--key", nargs='?', default=None,
+                        help="The binstar key for uploading "
+                             "(build only, required to upload)")
     ns = parser.parse_args()
 
     if ns.mode == 'setup':
