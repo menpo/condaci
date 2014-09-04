@@ -5,6 +5,7 @@ import os.path as p
 from functools import partial
 import platform as stdplatform
 import tempfile
+import uuid
 
 temp_installer_path = tempfile.mkstemp()[1]
 #temp_installer_path = 'C:\miniconda.exe'
@@ -34,12 +35,15 @@ host_arch = detect_arch()
 if host_platform == 'Windows':
     script_dir_name = 'Scripts'
     default_miniconda_dir = p.expanduser('C:\Miniconda')
+    temp_installer_path = 'C:\{}.exe'.format(uuid.uuid4())
 else:
     script_dir_name = 'bin'
     default_miniconda_dir = p.expanduser('~/miniconda')
+    temp_installer_path = p.expanduser('~/{}.sh'.format(uuid.uuid4()))
 
 
-miniconda_script_dir = lambda mc: p.join(default_miniconda_dir, script_dir_name)
+
+miniconda_script_dir = lambda mc: p.join(mc, script_dir_name)
 
 conda = lambda mc: p.join(miniconda_script_dir(mc), 'conda')
 binstar = lambda mc: p.join(miniconda_script_dir(mc), 'binstar')
