@@ -97,9 +97,6 @@ def execute_sequence(*cmds, **kwargs):
 
 
 def download_file(url, path_to_download):
-    if p.exists(path_to_download):
-        raise ValueError('Cannot download file to {} - '
-                         'file exists'.format(path_to_download))
     import urllib2
     f = urllib2.urlopen(url)
     with open(path_to_download, "wb") as fp:
