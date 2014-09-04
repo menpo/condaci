@@ -28,14 +28,14 @@ host_arch = detect_arch()
 # define our commands
 if host_platform == 'Windows':
     script_dir_name = 'Scripts'
-    miniconda_installer_path = 'C:\miniconda.exe'
-    miniconda_dir = p.expanduser('C:\Miniconda')
+    default_installer_path = 'C:\miniconda.exe'
+    default_miniconda_dir = p.expanduser('C:\Miniconda')
 else:
     script_dir_name = 'bin'
-    miniconda_installer_path = p.expanduser('~/miniconda.sh')
-    miniconda_dir = p.expanduser('~/miniconda')
+    default_installer_path = p.expanduser('~/miniconda.sh')
+    default_miniconda_dir = p.expanduser('~/miniconda')
 
-miniconda_script_dir = p.join(miniconda_dir, script_dir_name)
+miniconda_script_dir = p.join(default_miniconda_dir, script_dir_name)
 conda = p.join(miniconda_script_dir, 'conda')
 binstar = p.join(miniconda_script_dir, 'binstar')
 python = 'python'
@@ -93,6 +93,9 @@ def execute_sequence(*cmds, **kwargs):
 
 
 def download_file(url, path_to_download):
+    if p.exists(path_to_download):
+        raise ValueError('Cannot download file to {} - '
+                         'file exists'.format(path_to_download))
     import urllib2
     f = urllib2.urlopen(url)
     with open(path_to_download, "wb") as fp:
@@ -226,11 +229,12 @@ def install_miniconda(path_to_installer, path_to_install):
         execute([path_to_installer, '-b', '-p', path_to_install])
 
 
-def setup_miniconda(python_version, channel=None):
+def setup_miniconda(python_version, installation_path, channel=None):
     url = url_for_platform_version(host_platform, python_version, host_arch)
     print('Setting up miniconda from URL {}'.format(url))
-    acquire_miniconda(url, miniconda_installer_path)
-    install_miniconda(miniconda_installer_path, miniconda_dir)
+    print("(Installing to '{}')".format(installation_path))
+    acquire_miniconda(url, default_installer_path)
+    install_miniconda(default_installer_path, installation_path)
     cmds = [[conda, 'update', '-q', '--yes', 'conda'],
             [conda, 'install', '-q', '--yes', 'conda-build', 'jinja2',
              'binstar']]
@@ -325,31 +329,59 @@ def version_from_git_tags():
         ['git', 'describe', '--tags']).strip()[1:].replace('-', '_')
 
 
+def setup_cmd(ns):
+    print ns
+    if ns.path is None:
+        path = default_miniconda_dir
+    else:
+        path = ns.path
+    setup_miniconda(ns.python, path, channel=ns.channel)
+
+
+def build_cmd(ns):
+    build_upload_and_purge(ns.path, user=ns.user, key=ns.key)
+
+
+def upload_cmd(args):
+    print('upload being called with args: {}'.format(args))
+
+
+def version_cmd(_):
+    print(version_from_git_tags())
+
+
 if __name__ == "__main__":
     from argparse import ArgumentParser
     parser = ArgumentParser(
         description=r"""
         Sets up miniconda, builds, and uploads to binstar on Travis CI.
         """)
-    parser.add_argument("mode", choices=['setup', 'build', 'version'])
-    parser.add_argument("--python", choices=['2', '3'])
-    parser.add_argument("-c", "--channel",
-                        help="binstar channel to activate "
-                             "(setup only, optional)")
-    parser.add_argument("--path",
-                        help="path to the conda build scripts "
-                             "(build only, required)")
-    parser.add_argument("-u", "--user",
-                        help="binstar user to upload to "
-                             "(build only, required to upload)")
-    parser.add_argument("-k", "--key", nargs='?', default=None,
-                        help="The binstar key for uploading "
-                             "(build only, required to upload)")
-    ns = parser.parse_args()
+    subp = parser.add_subparsers()
 
-    if ns.mode == 'setup':
-        setup_miniconda(ns.python, channel=ns.channel)
-    elif ns.mode == 'build':
-        build_upload_and_purge(ns.path, user=ns.user, key=ns.key)
-    else:
-        print(version_from_git_tags())
+    sp = subp.add_parser('setup', help='setup a miniconda environment')
+    sp.add_argument("python", choices=['2', '3'])
+    sp.add_argument('-p', '--path', help='The path to install miniconda to. '
+                                         'If not provided defaults to {'
+                                         '}'.format(default_miniconda_dir))
+    sp.add_argument("-c", "--channel",
+                    help="binstar channel to activate")
+    sp.set_defaults(func=setup_cmd)
+
+
+    bp = subp.add_parser('build', help='run a conda build')
+    bp.add_argument("path", help="path to the conda build scripts")
+    bp.set_defaults(func=build_cmd)
+
+
+    up = subp.add_parser('upload', help='upload a conda build to binstar')
+    up.add_argument('path', help='path to the conda build scripts')
+    up.add_argument('user', help='Binstar user(or organisation) to upload to')
+    up.add_argument('key', help='Binstar API key to use for uploading')
+    up.set_defaults(func=upload_cmd)
+
+    vp = subp.add_parser('version', help='print the version as reported by '
+                                         'git')
+    vp.set_defaults(func=version_cmd)
+
+    args = parser.parse_args()
+    args.func(args)
