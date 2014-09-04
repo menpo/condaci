@@ -101,6 +101,7 @@ def download_file(url, path_to_download):
     f = urllib2.urlopen(url)
     with open(path_to_download, "wb") as fp:
         fp.write(f.read())
+    fp.close()
 
 
 # BINSTAR LOGIN
