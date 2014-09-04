@@ -4,6 +4,11 @@ import os
 import os.path as p
 from functools import partial
 import platform as stdplatform
+import tempfile
+
+temp_installer_path = tempfile.mkstemp()[1]
+#temp_installer_path = 'C:\miniconda.exe'
+#temp_installer_path = p.expanduser('~/miniconda.sh')
 
 
 def detect_arch():
@@ -28,17 +33,16 @@ host_arch = detect_arch()
 # define our commands
 if host_platform == 'Windows':
     script_dir_name = 'Scripts'
-    default_installer_path = 'C:\miniconda.exe'
     default_miniconda_dir = p.expanduser('C:\Miniconda')
 else:
     script_dir_name = 'bin'
-    default_installer_path = p.expanduser('~/miniconda.sh')
     default_miniconda_dir = p.expanduser('~/miniconda')
 
-miniconda_script_dir = p.join(default_miniconda_dir, script_dir_name)
-conda = p.join(miniconda_script_dir, 'conda')
-binstar = p.join(miniconda_script_dir, 'binstar')
-python = 'python'
+
+miniconda_script_dir = lambda mc: p.join(default_miniconda_dir, script_dir_name)
+
+conda = lambda mc: p.join(miniconda_script_dir(mc), 'conda')
+binstar = lambda mc: p.join(miniconda_script_dir(mc), 'binstar')
 
 # Amazingly, adding these causes conda-build to fail parsing yaml. :-|
 #print('running on {} {}'.format(platform, arch))
@@ -233,22 +237,25 @@ def setup_miniconda(python_version, installation_path, channel=None):
     url = url_for_platform_version(host_platform, python_version, host_arch)
     print('Setting up miniconda from URL {}'.format(url))
     print("(Installing to '{}')".format(installation_path))
-    acquire_miniconda(url, default_installer_path)
-    install_miniconda(default_installer_path, installation_path)
-    cmds = [[conda, 'update', '-q', '--yes', 'conda'],
-            [conda, 'install', '-q', '--yes', 'conda-build', 'jinja2',
+    acquire_miniconda(url, temp_installer_path)
+    install_miniconda(temp_installer_path, installation_path)
+    # delete the installer now we are done
+    os.unlink(temp_installer_path)
+    conda_cmd = conda(installation_path)
+    cmds = [[conda_cmd, 'update', '-q', '--yes', 'conda'],
+            [conda_cmd, 'install', '-q', '--yes', 'conda-build', 'jinja2',
              'binstar']]
     if channel is not None:
         print("(adding channel '{}' for dependencies)".format(channel))
-        cmds.append([conda, 'config', '--add', 'channels', channel])
+        cmds.append([conda_cmd, 'config', '--add', 'channels', channel])
     else:
         print("No channels have been configured (all dependencies have to be "
               "sourced from anaconda)")
     execute_sequence(*cmds)
 
 
-def build(path):
-    execute_sequence([conda, 'build', '-q', path])
+def build(mc, path):
+    execute_sequence([conda(mc), 'build', '-q', path])
 
 
 def get_conda_build_path(path):
@@ -257,10 +264,10 @@ def get_conda_build_path(path):
     return bldpkg_path(MetaData(path))
 
 
-def binstar_upload(key, user, channel, path):
+def binstar_upload(mc, key, user, channel, path):
     try:
         # TODO - could this safely be co? then we would get the binstar error..
-        check([binstar, '-t', key, 'upload',
+        check([binstar(mc), '-t', key, 'upload',
                '--force', '-u', user, '-c', channel, path])
     except subprocess.CalledProcessError as e:
         # mask the binstar key...
@@ -270,10 +277,10 @@ def binstar_upload(key, user, channel, path):
         raise subprocess.CalledProcessError(e.returncode, cmd)
 
 
-def build_upload_and_purge(path, user=None, key=None):
-    print('Building package at path {}'.format(ns.path))
+def build_upload_and_purge(mc, path, user=None, key=None):
+    print('Building package at path {}'.format(path))
     # actually issue conda build
-    build(path)
+    build(mc, path)
     if key is None:
         print('No binstar key provided')
     if user is None:
@@ -286,14 +293,14 @@ def build_upload_and_purge(path, user=None, key=None):
     if resolve_can_upload_from_travis():
         channel = resolve_channel_from_travis_state()
         print("Fit to upload to channel '{}'".format(channel))
-        upload_and_purge(key, user, channel, get_conda_build_path(path))
+        upload_and_purge(mc, key, user, channel, get_conda_build_path(path))
     else:
         print("Cannot upload to binstar - must be a PR.")
 
 
-def upload_and_purge(key, user, channel, filepath):
+def upload_and_purge(mc, key, user, channel, filepath):
     print('Uploading to {}/{}'.format(user, channel))
-    binstar_upload(key, user, channel, filepath)
+    binstar_upload(mc, key, user, channel, filepath)
     b = login_with_key(key)
     if channel != 'main':
         print("Purging old releases from channel '{}'".format(channel))
@@ -331,15 +338,21 @@ def version_from_git_tags():
 
 def setup_cmd(ns):
     print ns
-    if ns.path is None:
-        path = default_miniconda_dir
-    else:
+    if ns.path is not None:
         path = ns.path
+    else:
+        path = default_miniconda_dir
     setup_miniconda(ns.python, path, channel=ns.channel)
 
 
 def build_cmd(ns):
-    build_upload_and_purge(ns.path, user=ns.user, key=ns.key)
+    print ns
+    if ns.miniconda is not None:
+        mc = ns.miniconda
+    else:
+        mc = default_miniconda_dir
+    print mc, ns.buildpath
+    # build_upload_and_purge(mc, ns.buildpath, user=ns.user, key=ns.key)
 
 
 def upload_cmd(args):
@@ -369,7 +382,11 @@ if __name__ == "__main__":
 
 
     bp = subp.add_parser('build', help='run a conda build')
-    bp.add_argument("path", help="path to the conda build scripts")
+    bp.add_argument("buildpath", help="path to the conda build scripts")
+    bp.add_argument("-m", "--miniconda",
+                    help="directory that miniconda is installed in "
+                         "(if not provided taken as '{}')".format(
+                        default_miniconda_dir))
     bp.set_defaults(func=build_cmd)
 
 
