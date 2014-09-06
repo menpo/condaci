@@ -391,6 +391,7 @@ def version_cmd(_):
 
 def auto_cmd(args):
     mc = resolve_mc(args.miniconda)
+    build_conda_package(mc, args.buildpath)
     binstar_upload_if_appropriate(mc, args.buildpath, args.binstaruser,
                                   args.binstarkey)
     upload_to_pypi_if_appropriate(mc, args.pypiuser, args.pypipassword)
