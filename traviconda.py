@@ -5,7 +5,7 @@ import os.path as p
 from functools import partial
 import platform as stdplatform
 import uuid
-
+import sys
 
 
 def detect_arch():
@@ -25,6 +25,10 @@ def detect_arch():
 
 host_platform = stdplatform.system()
 host_arch = detect_arch()
+pypi_upload_allowed = (host_platform == 'Linux' and
+                       host_arch == '64bit' and
+                       sys.version_info.major == 2)
+
 
 pypirc_path = p.join(p.expanduser('~'), '.pypirc')
 
@@ -355,6 +359,8 @@ def upload_to_pypi_if_appropriate(mc, username, password):
     if not is_tagged_release():
         print('Not on a tagged release - not uploading to PyPI')
         return
+    if not pypi_upload_allowed:
+        print('Not on key node (Linux 64 Py2) - no PyPI upload')
     print('Setting up .pypirc file..')
     pypi_setup_dotfile(username, password)
     print("Uploading to PyPI user '{}'".format(username))
