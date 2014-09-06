@@ -349,8 +349,11 @@ def pypi_setup_dotfile(username, password):
 
 
 def upload_to_pypi_if_appropriate(mc, username, password):
+    if username is None or password is None:
+        print('Missing PyPI username or password, skipping upload')
+        return
     if not is_tagged_release():
-        print('not on a tagged release - not uploading to PyPI')
+        print('Not on a tagged release - not uploading to PyPI')
         return
     print('Setting up .pypirc file..')
     pypi_setup_dotfile(username, password)
