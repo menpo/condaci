@@ -4,12 +4,8 @@ import os
 import os.path as p
 from functools import partial
 import platform as stdplatform
-import tempfile
 import uuid
 
-temp_installer_path = tempfile.mkstemp()[1]
-#temp_installer_path = 'C:\miniconda.exe'
-#temp_installer_path = p.expanduser('~/miniconda.sh')
 
 
 def detect_arch():
@@ -30,6 +26,7 @@ def detect_arch():
 host_platform = stdplatform.system()
 host_arch = detect_arch()
 
+pypirc_path = p.join(p.expanduser('~'), '.pypirc')
 
 # define our commands
 if host_platform == 'Windows':
@@ -47,6 +44,7 @@ miniconda_script_dir = lambda mc: p.join(mc, script_dir_name)
 
 conda = lambda mc: p.join(miniconda_script_dir(mc), 'conda')
 binstar = lambda mc: p.join(miniconda_script_dir(mc), 'binstar')
+python = lambda mc: p.join(miniconda_script_dir(mc), 'python')
 
 # Amazingly, adding these causes conda-build to fail parsing yaml. :-|
 #print('running on {} {}'.format(platform, arch))
@@ -218,8 +216,7 @@ def purge_old_files(b, user, channel, filepath):
         remove_file(b, old_file)
 
 
-# TRAVICONDA CONVIENIENCE FUNCTIONS
-
+# TRAVICONDA CONVENIENCE FUNCTIONS
 
 def acquire_miniconda(url, path_to_download):
     print('Downloading miniconda from {} to {}'.format(url, path_to_download))
@@ -256,7 +253,8 @@ def setup_miniconda(python_version, installation_path, channel=None):
     execute_sequence(*cmds)
 
 
-def build(mc, path):
+def build_conda_package(mc, path):
+    print('Building package at path {}'.format(path))
     execute_sequence([conda(mc), 'build', '-q', path])
 
 
@@ -266,7 +264,7 @@ def get_conda_build_path(path):
     return bldpkg_path(MetaData(path))
 
 
-def binstar_upload(mc, key, user, channel, path):
+def binstar_upload_unchecked(mc, key, user, channel, path):
     try:
         # TODO - could this safely be co? then we would get the binstar error..
         check([binstar(mc), '-t', key, 'upload',
@@ -279,10 +277,7 @@ def binstar_upload(mc, key, user, channel, path):
         raise subprocess.CalledProcessError(e.returncode, cmd)
 
 
-def build_upload_and_purge(mc, path, user=None, key=None):
-    print('Building package at path {}'.format(path))
-    # actually issue conda build
-    build(mc, path)
+def binstar_upload_if_appropriate(mc, path, user, key):
     if key is None:
         print('No binstar key provided')
     if user is None:
@@ -293,16 +288,17 @@ def build_upload_and_purge(mc, path, user=None, key=None):
     print('Have a user ({}) and key - can upload if suitable'.format(user))
     # decide if we should attempt an upload
     if resolve_can_upload_from_travis():
-        channel = resolve_channel_from_travis_state()
+        channel = binstar_channel_from_travis_state()
         print("Fit to upload to channel '{}'".format(channel))
-        upload_and_purge(mc, key, user, channel, get_conda_build_path(path))
+        binstar_upload_and_purge(mc, key, user, channel,
+                                 get_conda_build_path(path))
     else:
         print("Cannot upload to binstar - must be a PR.")
 
 
-def upload_and_purge(mc, key, user, channel, filepath):
+def binstar_upload_and_purge(mc, key, user, channel, filepath):
     print('Uploading to {}/{}'.format(user, channel))
-    binstar_upload(mc, key, user, channel, filepath)
+    binstar_upload_unchecked(mc, key, user, channel, filepath)
     b = login_with_key(key)
     if channel != 'main':
         print("Purging old releases from channel '{}'".format(channel))
@@ -318,12 +314,18 @@ def resolve_can_upload_from_travis():
     return can_upload
 
 
-def resolve_channel_from_travis_state():
+def is_tagged_release():
+    branch = os.environ['TRAVIS_BRANCH']
+    tag = os.environ['TRAVIS_TAG']
+    return tag != '' and branch == tag
+
+
+def binstar_channel_from_travis_state():
     branch = os.environ['TRAVIS_BRANCH']
     tag = os.environ['TRAVIS_TAG']
     print('Travis branch is "{}"'.format(branch))
     print('Travis tag found is: "{}"'.format(tag))
-    if tag != '' and branch == tag:
+    if is_tagged_release():
         # final release, channel is 'main'
         print("on a tagged release -> upload to 'main'")
         return 'main'
@@ -333,74 +335,143 @@ def resolve_channel_from_travis_state():
         return branch
 
 
+pypi_template = """[distutils]
+index-servers = pypi
+
+[pypi]
+username:{}
+password:{}"""
+
+
+def pypi_setup_dotfile(username, password):
+    with open(pypirc_path, 'wb') as f:
+        f.write(pypi_template.format(username, password))
+
+
+def upload_to_pypi_if_appropriate(mc, username, password):
+    if not is_tagged_release():
+        print('not on a tagged release - not uploading to PyPI')
+        return
+    print('Setting up .pypirc file..')
+    pypi_setup_dotfile(username, password)
+    print("Uploading to PyPI user '{}'".format(username))
+    execute_sequence([python(mc), 'setup.py', 'sdist', 'upload'])
+
+
 def version_from_git_tags():
     return subprocess.check_output(
         ['git', 'describe', '--tags']).strip()[1:].replace('-', '_')
 
 
-def setup_cmd(ns):
-    print ns
-    if ns.path is not None:
-        path = ns.path
-    else:
-        path = default_miniconda_dir
-    setup_miniconda(ns.python, path, channel=ns.channel)
+def setup_cmd(args):
+    mc = resolve_mc(args.path)
+    setup_miniconda(args.python, mc, channel=args.channel)
 
 
-def build_cmd(ns):
-    print ns
-    if ns.miniconda is not None:
-        mc = ns.miniconda
-    else:
-        mc = default_miniconda_dir
-    print mc, ns.buildpath
-    # build_upload_and_purge(mc, ns.buildpath, user=ns.user, key=ns.key)
+def build_cmd(args):
+    mc = resolve_mc(args.miniconda)
+    build_conda_package(mc, args.buildpath)
 
 
-def upload_cmd(args):
-    print('upload being called with args: {}'.format(args))
+def binstar_cmd(args):
+    mc = resolve_mc(args.miniconda)
+    print('binstar being called with args: {}'.format(args))
+    binstar_upload_if_appropriate(mc, args.buildpath, args.binstaruser,
+                                  args.binstarkey)
+
+
+def pypi_cmd(args):
+    mc = resolve_mc(args.miniconda)
+    upload_to_pypi_if_appropriate(mc, args.pypiuser, args.pypipassword)
 
 
 def version_cmd(_):
     print(version_from_git_tags())
 
 
+def auto_cmd(args):
+    mc = resolve_mc(args.miniconda)
+    binstar_upload_if_appropriate(mc, args.buildpath, args.binstaruser,
+                                  args.binstarkey)
+    upload_to_pypi_if_appropriate(mc, args.pypiuser, args.pypipassword)
+
+
+def resolve_mc(mc):
+    if mc is not None:
+        return mc
+    else:
+        return default_miniconda_dir
+
+
+def add_miniconda_parser(parser):
+    parser.add_argument(
+        "-m", "--miniconda",
+        help="directory that miniconda is installed in (if not provided "
+             "taken as '{}')".format(default_miniconda_dir))
+
+
+def add_pypi_parser(pa):
+    pa.add_argument('--pypiuser',  nargs='?', default=None,
+                    help='PyPI user to upload to')
+    pa.add_argument('--pypipassword', nargs='?', default=None,
+                    help='password of PyPI user')
+
+
+def add_buildpath_parser(pa):
+    pa.add_argument('buildpath',
+                    help="path to the conda build scripts")
+
+
+def add_binstar_parser(pa):
+    pa.add_argument('--binstaruser', nargs='?', default=None,
+                    help='Binstar user (or organisation) to upload to')
+    pa.add_argument('--binstarkey', nargs='?', default=None,
+                    help='Binstar API key to use for uploading')
+
+
 if __name__ == "__main__":
     from argparse import ArgumentParser
-    parser = ArgumentParser(
+    pa = ArgumentParser(
         description=r"""
-        Sets up miniconda, builds, and uploads to binstar on Travis CI.
+        Sets up miniconda, builds, and uploads to Binstar and PyPI.
         """)
-    subp = parser.add_subparsers()
+    subp = pa.add_subparsers()
 
     sp = subp.add_parser('setup', help='setup a miniconda environment')
     sp.add_argument("python", choices=['2', '3'])
-    sp.add_argument('-p', '--path', help='The path to install miniconda to. '
+    sp.add_argument('-p', '--path', help='the path to install miniconda to. '
                                          'If not provided defaults to {'
                                          '}'.format(default_miniconda_dir))
     sp.add_argument("-c", "--channel",
                     help="binstar channel to activate")
     sp.set_defaults(func=setup_cmd)
 
-
     bp = subp.add_parser('build', help='run a conda build')
-    bp.add_argument("buildpath", help="path to the conda build scripts")
-    bp.add_argument("-m", "--miniconda",
-                    help="directory that miniconda is installed in "
-                         "(if not provided taken as '{}')".format(
-                        default_miniconda_dir))
+    add_buildpath_parser(bp)
+    add_miniconda_parser(bp)
     bp.set_defaults(func=build_cmd)
 
+    bin = subp.add_parser('binstar', help='upload a conda build to binstar')
+    add_buildpath_parser(bin)
+    add_binstar_parser(bin)
+    add_miniconda_parser(bin)
+    bin.set_defaults(func=binstar_cmd)
 
-    up = subp.add_parser('upload', help='upload a conda build to binstar')
-    up.add_argument('path', help='path to the conda build scripts')
-    up.add_argument('user', help='Binstar user(or organisation) to upload to')
-    up.add_argument('key', help='Binstar API key to use for uploading')
-    up.set_defaults(func=upload_cmd)
+    pypi = subp.add_parser('pypi', help='upload a source distribution to PyPI')
+    add_pypi_parser(pypi)
+    add_miniconda_parser(pypi)
+    pypi.set_defaults(func=pypi_cmd)
+
+    auto = subp.add_parser('auto', help='build and upload to binstar and pypi')
+    add_buildpath_parser(auto)
+    add_binstar_parser(auto)
+    add_miniconda_parser(auto)
+    add_pypi_parser(auto)
+    auto.set_defaults(func=auto_cmd)
 
     vp = subp.add_parser('version', help='print the version as reported by '
                                          'git')
     vp.set_defaults(func=version_cmd)
 
-    args = parser.parse_args()
+    args = pa.parse_args()
     args.func(args)
