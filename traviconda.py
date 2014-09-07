@@ -403,7 +403,8 @@ def auto_cmd(args):
     build_conda_package(mc, args.buildpath)
     binstar_upload_if_appropriate(mc, args.buildpath, args.binstaruser,
                                   args.binstarkey)
-    upload_to_pypi_if_appropriate(mc, args.pypiuser, args.pypipassword)
+    print('warning: pypi uploading is currently disabled')
+    #upload_to_pypi_if_appropriate(mc, args.pypiuser, args.pypipassword)
 
 
 def resolve_mc(mc):
