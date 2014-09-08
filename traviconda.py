@@ -281,7 +281,7 @@ def binstar_upload_unchecked(mc, key, user, channel, path):
         raise subprocess.CalledProcessError(e.returncode, cmd)
 
 
-def binstar_upload_if_appropriate(mc, path, user, key):
+def binstar_upload_if_appropriate(mc, path, user, key, channel=None):
     if key is None:
         print('No binstar key provided')
     if user is None:
@@ -292,7 +292,9 @@ def binstar_upload_if_appropriate(mc, path, user, key):
     print('Have a user ({}) and key - can upload if suitable'.format(user))
     # decide if we should attempt an upload
     if resolve_can_upload_from_travis():
-        channel = binstar_channel_from_travis_state()
+        if channel is None:
+            print('resolving channel from travis state')
+            channel = binstar_channel_from_travis_state()
         print("Fit to upload to channel '{}'".format(channel))
         binstar_upload_and_purge(mc, key, user, channel,
                                  get_conda_build_path(path))
@@ -386,7 +388,7 @@ def binstar_cmd(args):
     mc = resolve_mc(args.miniconda)
     print('binstar being called with args: {}'.format(args))
     binstar_upload_if_appropriate(mc, args.buildpath, args.binstaruser,
-                                  args.binstarkey)
+                                  args.binstarkey, channel=args.binstarchannel)
 
 
 def pypi_cmd(args):
@@ -402,7 +404,8 @@ def auto_cmd(args):
     mc = resolve_mc(args.miniconda)
     build_conda_package(mc, args.buildpath)
     binstar_upload_if_appropriate(mc, args.buildpath, args.binstaruser,
-                                  args.binstarkey)
+                                  args.binstarkey,
+                                  channel=args.binstarchannel)
     print('warning: pypi uploading is currently disabled')
     #upload_to_pypi_if_appropriate(mc, args.pypiuser, args.pypipassword)
 
@@ -436,6 +439,9 @@ def add_buildpath_parser(pa):
 def add_binstar_parser(pa):
     pa.add_argument('--binstaruser', nargs='?', default=None,
                     help='Binstar user (or organisation) to upload to')
+    pa.add_argument('--binstarchannel', nargs='?', default=None,
+                    help='Binstar channel to uplaod to. If not provided will'
+                         ' be calculated based on the environment')
     pa.add_argument('--binstarkey', nargs='?', default=None,
                     help='Binstar API key to use for uploading')
 
