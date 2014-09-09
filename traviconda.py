@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import subprocess
+from subprocess import CalledProcessError
 import os
 import os.path as p
 from functools import partial
@@ -75,19 +76,28 @@ def url_for_platform_version(platform, py_version, arch):
                      arch_str[arch]]) + ext[platform]
 
 # forward stderr to stdout
-co = partial(subprocess.check_output, stderr=subprocess.STDOUT)
+popen = partial(subprocess.Popen, stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT)
 check = partial(subprocess.check_call, stderr=subprocess.STDOUT)
 
 
-def execute(cmd, verbose=False):
+def execute(cmd, verbose=True):
     r""" Runs a command, printing the command and it's output to screen.
     """
     if verbose:
         print('> {}'.format(' '.join(cmd)))
-    result = co(cmd)
-    if verbose:
-        print(result)
-    return result
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT)
+    for line in iter(proc.stdout.readline, ""):
+        if verbose:
+            sys.stdout.write(line)
+            sys.stdout.flush()
+    output = proc.communicate()[0]
+    if proc.returncode == 0:
+        return output
+    else:
+        raise subprocess.CalledProcessError(proc.returncode, cmd,
+                                            output=output)
 
 
 def execute_sequence(*cmds, **kwargs):
