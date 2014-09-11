@@ -76,8 +76,6 @@ def url_for_platform_version(platform, py_version, arch):
                      arch_str[arch]]) + ext[platform]
 
 # forward stderr to stdout
-popen = partial(subprocess.Popen, stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT)
 check = partial(subprocess.check_call, stderr=subprocess.STDOUT)
 
 
@@ -90,7 +88,7 @@ def execute(cmd, verbose=True):
                             stderr=subprocess.STDOUT)
     for line in iter(proc.stdout.readline, ""):
         if verbose:
-            sys.stdout.write(line)
+            sys.stdout.write(str(line))
             sys.stdout.flush()
     output = proc.communicate()[0]
     if proc.returncode == 0:
