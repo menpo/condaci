@@ -115,8 +115,12 @@ def execute(cmd, verbose=True, env_additions=None):
                             stderr=subprocess.STDOUT, env=env_for_p)
     for line in iter(proc.stdout.readline, ""):
         if verbose:
-            sys.stdout.write(str(line))
-            sys.stdout.flush()
+            if sys.version_info.major == 3:
+                # convert bytes to string
+                line = line.decode("utf-8")
+            if len(line) > 0:
+                sys.stdout.write(line)
+                sys.stdout.flush()
     output = proc.communicate()[0]
     if proc.returncode == 0:
         return output
