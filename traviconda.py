@@ -39,9 +39,11 @@ pypi_upload_allowed = (host_platform == 'Linux' and
 
 
 def version_from_git_tags():
-    return subprocess.check_output(
-        ['git', 'describe',
-         '--tags']).strip().decode("utf-8")[1:].replace('-', '_').encode()
+    raw = subprocess.check_output(['git', 'describe', '--tags']).strip()
+    if sys.version_info.major == 3:
+        # this always comes back as bytes. On Py3, convert to a string
+        raw = raw.decode("utf-8")
+    return raw[1:].replace('-', '_')  # always return a string (guaranteed)
 
 
 try:
