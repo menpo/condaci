@@ -476,6 +476,8 @@ def version_from_git_tags():
 
 def setup_cmd(args):
     mc = resolve_mc(args.path)
+    for k, v in os.environ.items():
+        print('{}: {}'.format(k, v))
     setup_miniconda(args.python, mc, channel=args.channel)
 
 
