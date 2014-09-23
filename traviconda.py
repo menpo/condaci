@@ -288,8 +288,11 @@ def setup_miniconda(python_version, installation_path, channel=None):
 
 def build_conda_package(mc, path):
     print('Building package at path {}'.format(path))
-    execute([conda(mc), 'build', '-q', path],
-            env_additions={'TC_PACKAGE_VERSION': version_from_git_tags()})
+    try:
+        env_additions = {'TC_PACKAGE_VERSION': version_from_git_tags()}
+    except subprocess.CalledProcessError:
+        env_additions = None
+    execute([conda(mc), 'build', '-q', path], env_additions=env_additions)
 
 
 def get_conda_build_path(path):
