@@ -97,7 +97,6 @@ def execute(cmd, verbose=True, env_additions=None):
             sys.stdout.write(str(line))
             sys.stdout.flush()
     output = proc.communicate()[0]
-    print env_for_p['NEWBY']
     if proc.returncode == 0:
         return output
     else:
