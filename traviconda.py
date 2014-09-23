@@ -426,7 +426,8 @@ def upload_to_pypi_if_appropriate(mc, username, password):
 
 def version_from_git_tags():
     return subprocess.check_output(
-        ['git', 'describe', '--tags']).strip()[1:].replace('-', '_')
+        ['git', 'describe',
+         '--tags']).strip().decode("utf-8")[1:].replace('-', '_')
 
 
 def git_head_has_tag():
