@@ -38,6 +38,17 @@ pypi_upload_allowed = (host_platform == 'Linux' and
                        sys.version_info.major == 2)
 
 
+def version_from_git_tags():
+    return subprocess.check_output(
+        ['git', 'describe',
+         '--tags']).strip().decode("utf-8")[1:].replace('-', '_').encode()
+
+
+try:
+    os.environ['TC_PACKAGE_VERSION'] = version_from_git_tags()
+except subprocess.CalledProcessError:
+    print('Warning - unable to set TC_PACKAGE_VERSION')
+
 pypirc_path = p.join(p.expanduser('~'), '.pypirc')
 
 # define our commands
@@ -300,11 +311,7 @@ def build_conda_package(mc, path):
         print('found BINSTAR_KEY in environment on Windows - deleting to '
               'stop vcvarsall from telling the world')
         del os.environ['BINSTAR_KEY']
-    try:
-        env_additions = {'TC_PACKAGE_VERSION': version_from_git_tags()}
-    except subprocess.CalledProcessError:
-        env_additions = None
-    execute([conda(mc), 'build', '-q', path], env_additions=env_additions)
+    execute([conda(mc), 'build', '-q', path])
 
 
 def get_conda_build_path(path):
@@ -422,12 +429,6 @@ def upload_to_pypi_if_appropriate(mc, username, password):
     pypi_setup_dotfile(username, password)
     print("Uploading to PyPI user '{}'".format(username))
     execute_sequence([python(mc), 'setup.py', 'sdist', 'upload'])
-
-
-def version_from_git_tags():
-    return subprocess.check_output(
-        ['git', 'describe',
-         '--tags']).strip().decode("utf-8")[1:].replace('-', '_').encode()
 
 
 def git_head_has_tag():
