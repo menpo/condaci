@@ -8,12 +8,12 @@ import uuid
 import sys
 
 
-def is_on_app_veyor():
-    'APPVEYOR' in os.environ
+def is_on_appveyor():
+    return 'APPVEYOR' in os.environ
 
 
 def is_on_travis():
-    'TRAVIS' in os.environ
+    return 'TRAVIS' in os.environ
 
 
 def detect_arch():
@@ -334,7 +334,7 @@ def binstar_upload_if_appropriate(mc, path, user, key, channel=None):
     # decide if we should attempt an upload
     if resolve_can_upload_from_ci():
         if channel is None:
-            print('resolving channel from CI state')
+            print('resolving channel from CI/git tags')
             channel = binstar_channel_from_ci()
         print("Fit to upload to channel '{}'".format(channel))
         binstar_upload_and_purge(mc, key, user, channel,
@@ -355,90 +355,41 @@ def binstar_upload_and_purge(mc, key, user, channel, filepath):
 
 
 def resolve_can_upload_from_ci():
+    # can upload as long as this isn't a PR
     if is_on_travis():
-        return resolve_can_upload_from_travis()
-    elif is_on_app_veyor():
-        return resolve_can_upload_from_app_veyor()
+        is_pr = is_pr_from_travis()
+    elif is_on_appveyor():
+        is_pr = is_pr_from_appveyor()
     else:
         raise ValueError('Not on app veyor or travis so cant '
                          'resolve whether we can upload')
-
-
-def resolve_can_upload_from_travis():
-    is_a_pr = os.environ['TRAVIS_PULL_REQUEST'] != 'false'
-    can_upload = not is_a_pr
+    can_upload = not is_pr
     print("Can we can upload? : {}".format(can_upload))
     return can_upload
 
 
-def resolve_can_upload_from_app_veyor():
-    print('appveypr pr: {}'.format(os.environ['APPVEYOR_PULL_REQUEST_NUMBER']))
-    is_a_pr = os.environ['APPVEYOR_PULL_REQUEST_NUMBER'] != 'false'
-    can_upload = not is_a_pr
-    print("Can we can upload? : {}".format(can_upload))
-    return False  # todo change
-
-
-def is_tagged_release_from_ci():
-    if is_on_travis():
-        return is_tagged_release_from_travis()
-    elif is_on_app_veyor():
-        return is_tagged_release_from_app_veyor()
-    else:
-        raise ValueError('Not on app veyor or travis so cant '
-                         'decide if tagged release')
-
-
-def is_tagged_release_from_travis():
-    branch = os.environ['TRAVIS_BRANCH']
-    tag = os.environ['TRAVIS_TAG']
-    return tag != '' and branch == tag
-
-
-def is_tagged_release_from_app_veyor():
-    branch = os.environ['TRAVIS_BRANCH']
-    tag = os.environ['TRAVIS_TAG']
-    return tag != '' and branch == tag
+is_pr_from_travis = lambda: os.environ['TRAVIS_PULL_REQUEST'] != 'false'
+is_pr_from_appveyor = lambda: 'APPVEYOR_PULL_REQUEST_NUMBER' in os.environ
 
 
 def binstar_channel_from_ci():
+    if git_head_has_tag():
+        # tagged releases always go to main
+        print("current head is a tagged release ({}), "
+              "uploading to 'main' channel".format(version_from_git_tags()))
+        return 'main'
     if is_on_travis():
-        return binstar_channel_from_travis()
-    elif is_on_app_veyor():
-        return binstar_channel_from_app_veyor()
+        return branch_from_travis()
+    elif is_on_appveyor():
+        return branch_from_appveyor()
     else:
-        raise ValueError('Not on app veyor or travis so cant '
-                         'devide binstar channel')
+        raise ValueError("An untagged release, and we aren't on "
+                         "Appveyor or Travis so can't "
+                         "decide on binstar channel")
 
 
-def binstar_channel_from_travis():
-    branch = os.environ['TRAVIS_BRANCH']
-    tag = os.environ['TRAVIS_TAG']
-    print('Travis branch is "{}"'.format(branch))
-    print('Travis tag found is: "{}"'.format(tag))
-    if is_tagged_release_from_ci():
-        # final release, channel is 'main'
-        print("on a tagged release -> upload to 'main'")
-        return 'main'
-    else:
-        print("not on a tag on master - "
-              "just upload to the branch name {}".format(branch))
-        return branch
-
-
-def binstar_channel_from_app_veyor():
-    branch = os.environ['TRAVIS_BRANCH']
-    tag = os.environ['TRAVIS_TAG']
-    print('Travis branch is "{}"'.format(branch))
-    print('Travis tag found is: "{}"'.format(tag))
-    if is_tagged_release_from_ci():
-        # final release, channel is 'main'
-        print("on a tagged release -> upload to 'main'")
-        return 'main'
-    else:
-        print("not on a tag on master - "
-              "just upload to the branch name {}".format(branch))
-        return branch
+branch_from_appveyor = lambda: os.environ['APPVEYOR_REPO_BRANCH']
+branch_from_travis = lambda: os.environ['TRAVIS_BRANCH']
 
 
 pypi_template = """[distutils]
@@ -458,7 +409,7 @@ def upload_to_pypi_if_appropriate(mc, username, password):
     if username is None or password is None:
         print('Missing PyPI username or password, skipping upload')
         return
-    if not is_tagged_release_from_ci():
+    if not git_head_has_tag():
         print('Not on a tagged release - not uploading to PyPI')
         return
     if not pypi_upload_allowed:
@@ -472,6 +423,14 @@ def upload_to_pypi_if_appropriate(mc, username, password):
 def version_from_git_tags():
     return subprocess.check_output(
         ['git', 'describe', '--tags']).strip()[1:].replace('-', '_')
+
+
+def git_head_has_tag():
+    try:
+        execute(['git', 'describe', '--exact-match', '--tags', 'HEAD'])
+        return True
+    except subprocess.CalledProcessError:
+        return False
 
 
 def setup_cmd(args):
