@@ -296,6 +296,10 @@ def setup_miniconda(python_version, installation_path, channel=None):
 
 def build_conda_package(mc, path):
     print('Building package at path {}'.format(path))
+    if 'BINSTAR_KEY' in os.environ and host_platform == 'Windows':
+        print('found BINSTAR_KEY in environment on Windows - deleting to '
+              'stop vcvarsall from telling the world')
+        del os.environ['BINSTAR_KEY']
     try:
         env_additions = {'TC_PACKAGE_VERSION': version_from_git_tags()}
     except subprocess.CalledProcessError:
