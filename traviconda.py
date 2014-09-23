@@ -123,7 +123,6 @@ def execute(cmd, verbose=True, env_additions=None):
                 line = line.decode("utf-8")
             sys.stdout.write(line)
             sys.stdout.flush()
-    print('finished reading lines')
     output = proc.communicate()[0]
     if proc.returncode == 0:
         return output
@@ -321,7 +320,6 @@ def build_conda_package(mc, path):
               'stop vcvarsall from telling the world')
         del os.environ['BINSTAR_KEY']
     execute([conda(mc), 'build', '-q', path])
-    print('finished conda build command')
 
 
 def get_conda_build_path(path):
@@ -482,7 +480,6 @@ def auto_cmd(args):
     binstar_upload_if_appropriate(mc, args.buildpath, args.binstaruser,
                                   args.binstarkey,
                                   channel=args.binstarchannel)
-    print('warning: pypi uploading is currently disabled')
     #upload_to_pypi_if_appropriate(mc, args.pypiuser, args.pypipassword)
 
 
