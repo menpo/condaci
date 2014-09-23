@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import subprocess
-from subprocess import CalledProcessError
 import os
 import os.path as p
 from functools import partial
@@ -79,35 +78,40 @@ def url_for_platform_version(platform, py_version, arch):
 check = partial(subprocess.check_call, stderr=subprocess.STDOUT)
 
 
-def execute(cmd, verbose=True):
+def execute(cmd, verbose=True, env_additions=None):
     r""" Runs a command, printing the command and it's output to screen.
     """
+    env_for_p = os.environ.copy()
+    if env_additions is not None:
+        env_for_p.update(env_additions)
     if verbose:
         print('> {}'.format(' '.join(cmd)))
+        if env_additions is not None:
+            print('Additional environment variables: '
+                  '{}'.format(', '.join(['{}={}'.format(k, v)
+                                         for k, v in env_additions.items()])))
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT)
+                            stderr=subprocess.STDOUT, env=env_for_p)
     for line in iter(proc.stdout.readline, ""):
         if verbose:
             sys.stdout.write(str(line))
             sys.stdout.flush()
     output = proc.communicate()[0]
+    print env_for_p['NEWBY']
     if proc.returncode == 0:
         return output
     else:
-        raise subprocess.CalledProcessError(proc.returncode, cmd,
-                                            output=output)
+        e = subprocess.CalledProcessError(proc.returncode, cmd, output=output)
+        print(' -> {}'.format(e.output))
+        raise e
 
 
 def execute_sequence(*cmds, **kwargs):
     r""" Execute a sequence of commands. If any fails, display an error.
     """
     verbose = kwargs.get('verbose', True)
-    try:
-        for cmd in cmds:
-            execute(cmd, verbose)
-    except subprocess.CalledProcessError as e:
-        print(' -> {}'.format(e.output))
-        raise e
+    for cmd in cmds:
+        execute(cmd, verbose)
 
 
 def download_file(url, path_to_download):
@@ -265,9 +269,28 @@ def setup_miniconda(python_version, installation_path, channel=None):
     execute_sequence(*cmds)
 
 
+# win_sdk_dir = 'C:\Program Files\Microsoft SDKs\Windows'
+# win_sdk_version_str = "v7.0"
+#
+# win_sdk_version_bin = os.path.join([win_sdk_dir, win_sdk_version_str,
+#                                     'Setup', 'WindowsSdkVer.exe'])
+#
+# win_set_env_bin = os.path.join([win_sdk_dir, win_sdk_version_str,
+#                                 'Bin', 'SetEnv.cmd'])
+# win_sdk_version_cmd = [win_sdk_version_bin, '-q',
+#                        '-version:{}'.format(win_sdk_version_str)]
+#
+# win_sdk_set_env_cmd = [win_set_env_bin, '/x64', '/release']
+#
+# myenv = os.environ.copy()
+# myenv['MSSdk'] = 1
+# myenv['DISTUTILS_USE_SDK'] = 1
+
+
 def build_conda_package(mc, path):
     print('Building package at path {}'.format(path))
-    execute_sequence([conda(mc), 'build', '-q', path])
+    execute([conda(mc), 'build', '-q', path],
+            env_additions={'TC_PACKAGE_VERSION': version_from_git_tags()})
 
 
 def get_conda_build_path(path):
