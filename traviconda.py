@@ -113,7 +113,10 @@ def execute(cmd, verbose=True, env_additions=None):
                                          for k, v in env_additions.items()])))
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, env=env_for_p)
-    for line in iter(proc.stdout.readline, ""):
+    sentinal = ''
+    if sys.version_info.major == 3:
+        sentinal = b''
+    for line in iter(proc.stdout.readline, sentinal):
         if verbose:
             if sys.version_info.major == 3:
                 # convert bytes to string
