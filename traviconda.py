@@ -120,6 +120,7 @@ def execute(cmd, verbose=True, env_additions=None):
                 line = line.decode("utf-8")
             sys.stdout.write(line)
             sys.stdout.flush()
+    print('finished reading lines')
     output = proc.communicate()[0]
     if proc.returncode == 0:
         return output
@@ -317,6 +318,7 @@ def build_conda_package(mc, path):
               'stop vcvarsall from telling the world')
         del os.environ['BINSTAR_KEY']
     execute([conda(mc), 'build', '-q', path])
+    print('finished conda build command')
 
 
 def get_conda_build_path(path):
@@ -473,6 +475,7 @@ def version_cmd(_):
 def auto_cmd(args):
     mc = resolve_mc(args.miniconda)
     build_conda_package(mc, args.buildpath)
+    print('successfully built conda package, proceeding to upload')
     binstar_upload_if_appropriate(mc, args.buildpath, args.binstaruser,
                                   args.binstarkey,
                                   channel=args.binstarchannel)
