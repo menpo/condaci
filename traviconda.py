@@ -8,6 +8,14 @@ import uuid
 import sys
 
 
+def is_on_app_veyor():
+    'APPVEYOR' in os.environ
+
+
+def is_on_travis():
+    'TRAVIS' in os.environ
+
+
 def detect_arch():
     arch = stdplatform.architecture()[0]
     # need to be a little more sneaky to check the platform on Windows:
@@ -324,10 +332,10 @@ def binstar_upload_if_appropriate(mc, path, user, key, channel=None):
         return
     print('Have a user ({}) and key - can upload if suitable'.format(user))
     # decide if we should attempt an upload
-    if resolve_can_upload_from_travis():
+    if resolve_can_upload_from_ci():
         if channel is None:
-            print('resolving channel from travis state')
-            channel = binstar_channel_from_travis_state()
+            print('resolving channel from CI state')
+            channel = binstar_channel_from_ci()
         print("Fit to upload to channel '{}'".format(channel))
         binstar_upload_and_purge(mc, key, user, channel,
                                  get_conda_build_path(path))
@@ -346,6 +354,16 @@ def binstar_upload_and_purge(mc, key, user, channel, filepath):
         print("On main channel - no purging of releases will be done.")
 
 
+def resolve_can_upload_from_ci():
+    if is_on_travis():
+        return resolve_can_upload_from_travis()
+    elif is_on_app_veyor():
+        return resolve_can_upload_from_app_veyor()
+    else:
+        raise ValueError('Not on app veyor or travis so cant '
+                         'resolve whether we can upload')
+
+
 def resolve_can_upload_from_travis():
     is_a_pr = os.environ['TRAVIS_PULL_REQUEST'] != 'false'
     can_upload = not is_a_pr
@@ -353,18 +371,67 @@ def resolve_can_upload_from_travis():
     return can_upload
 
 
-def is_tagged_release():
+def resolve_can_upload_from_app_veyor():
+    print('appveypr pr: {}'.format(os.environ['APPVEYOR_PULL_REQUEST_NUMBER']))
+    is_a_pr = os.environ['APPVEYOR_PULL_REQUEST_NUMBER'] != 'false'
+    can_upload = not is_a_pr
+    print("Can we can upload? : {}".format(can_upload))
+    return False  # todo change
+
+
+def is_tagged_release_from_ci():
+    if is_on_travis():
+        return is_tagged_release_from_travis()
+    elif is_on_app_veyor():
+        return is_tagged_release_from_app_veyor()
+    else:
+        raise ValueError('Not on app veyor or travis so cant '
+                         'decide if tagged release')
+
+
+def is_tagged_release_from_travis():
     branch = os.environ['TRAVIS_BRANCH']
     tag = os.environ['TRAVIS_TAG']
     return tag != '' and branch == tag
 
 
-def binstar_channel_from_travis_state():
+def is_tagged_release_from_app_veyor():
+    branch = os.environ['TRAVIS_BRANCH']
+    tag = os.environ['TRAVIS_TAG']
+    return tag != '' and branch == tag
+
+
+def binstar_channel_from_ci():
+    if is_on_travis():
+        return binstar_channel_from_travis()
+    elif is_on_app_veyor():
+        return binstar_channel_from_app_veyor()
+    else:
+        raise ValueError('Not on app veyor or travis so cant '
+                         'devide binstar channel')
+
+
+def binstar_channel_from_travis():
     branch = os.environ['TRAVIS_BRANCH']
     tag = os.environ['TRAVIS_TAG']
     print('Travis branch is "{}"'.format(branch))
     print('Travis tag found is: "{}"'.format(tag))
-    if is_tagged_release():
+    if is_tagged_release_from_ci():
+        # final release, channel is 'main'
+        print("on a tagged release -> upload to 'main'")
+        return 'main'
+    else:
+        print("not on a tag on master - "
+              "just upload to the branch name {}".format(branch))
+        return branch
+
+
+def binstar_channel_from_app_veyor():
+    branch = os.environ['TRAVIS_BRANCH']
+    tag = os.environ['TRAVIS_TAG']
+    print('Travis branch is "{}"'.format(branch))
+    print('Travis tag found is: "{}"'.format(tag))
+    if is_tagged_release_from_ci():
         # final release, channel is 'main'
         print("on a tagged release -> upload to 'main'")
         return 'main'
@@ -391,7 +458,7 @@ def upload_to_pypi_if_appropriate(mc, username, password):
     if username is None or password is None:
         print('Missing PyPI username or password, skipping upload')
         return
-    if not is_tagged_release():
+    if not is_tagged_release_from_ci():
         print('Not on a tagged release - not uploading to PyPI')
         return
     if not pypi_upload_allowed:
