@@ -296,30 +296,42 @@ def setup_miniconda(python_version, installation_path, channel=None):
     execute_sequence(*cmds)
 
 
-# win_sdk_dir = 'C:\Program Files\Microsoft SDKs\Windows'
-# win_sdk_version_str = "v7.0"
-#
-# win_sdk_version_bin = os.path.join([win_sdk_dir, win_sdk_version_str,
-#                                     'Setup', 'WindowsSdkVer.exe'])
-#
-# win_set_env_bin = os.path.join([win_sdk_dir, win_sdk_version_str,
-#                                 'Bin', 'SetEnv.cmd'])
-# win_sdk_version_cmd = [win_sdk_version_bin, '-q',
-#                        '-version:{}'.format(win_sdk_version_str)]
-#
-# win_sdk_set_env_cmd = [win_set_env_bin, '/x64', '/release']
-#
-# myenv = os.environ.copy()
-# myenv['MSSdk'] = 1
-# myenv['DISTUTILS_USE_SDK'] = 1
+def configure_win_sdk_64bit():
+    win_sdk_dir = 'C:\Program Files\Microsoft SDKs\Windows'
+    if sys.version_info.major == 2:
+        win_sdk_version_str = "v7.0"
+    elif sys.version_info.major == 3:
+        win_sdk_version_str = "v7.1"
+    else:
+        raise ValueError('Unsupported major Python version')
+
+    win_sdk_version_bin = os.path.join([win_sdk_dir, win_sdk_version_str,
+                                        'Setup', 'WindowsSdkVer.exe'])
+
+    win_set_env_bin = os.path.join([win_sdk_dir, win_sdk_version_str,
+                                    'Bin', 'SetEnv.cmd'])
+    win_sdk_version_cmd = [win_sdk_version_bin, '-q',
+                           '-version:{}'.format(win_sdk_version_str)]
+
+    win_sdk_set_env_cmd = [win_set_env_bin, '/x64', '/release']
+
+    os.environ['MSSdk'] = 1
+    os.environ['DISTUTILS_USE_SDK'] = 1
+
+    execute(win_sdk_version_cmd, verbose=True)
+    execute(win_sdk_set_env_cmd, verbose=True)
 
 
 def build_conda_package(mc, path):
     print('Building package at path {}'.format(path))
-    if 'BINSTAR_KEY' in os.environ and host_platform == 'Windows':
-        print('found BINSTAR_KEY in environment on Windows - deleting to '
-              'stop vcvarsall from telling the world')
-        del os.environ['BINSTAR_KEY']
+    if host_platform == 'Windows':
+        if 'BINSTAR_KEY' in os.environ:
+            print('found BINSTAR_KEY in environment on Windows - deleting to '
+                  'stop vcvarsall from telling the world')
+            del os.environ['BINSTAR_KEY']
+        if host_arch == 'x64':
+            print('running on 64 bit Windows - configuring Windows SDK')
+            configure_win_sdk_64bit()
     execute([conda(mc), 'build', '-q', path])
 
 
@@ -449,8 +461,9 @@ def git_head_has_tag():
 
 
 def setup_cmd(args):
-    mc = resolve_mc(args.path)
-    setup_miniconda(args.python, mc, channel=args.channel)
+    configure_win_sdk_64bit()
+    # mc = resolve_mc(args.path)
+    # setup_miniconda(args.python, mc, channel=args.channel)
 
 
 def build_cmd(args):
