@@ -113,7 +113,7 @@ def execute(cmd, verbose=True, env_additions=None):
                                          for k, v in env_additions.items()])))
     env_for_p_b4 = env_for_p.copy()
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT, env=env_for_p)
+                            stderr=subprocess.STDOUT, env=env_for_p, shell=True)
     sentinal = ''
     if sys.version_info.major == 3:
         sentinal = b''
