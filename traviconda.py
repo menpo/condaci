@@ -305,11 +305,11 @@ def configure_win_sdk_64bit():
     else:
         raise ValueError('Unsupported major Python version')
 
-    win_sdk_version_bin = os.path.join([win_sdk_dir, win_sdk_version_str,
-                                        'Setup', 'WindowsSdkVer.exe'])
+    win_sdk_version_bin = os.path.join(win_sdk_dir, win_sdk_version_str,
+                                       'Setup', 'WindowsSdkVer.exe')
 
-    win_set_env_bin = os.path.join([win_sdk_dir, win_sdk_version_str,
-                                    'Bin', 'SetEnv.cmd'])
+    win_set_env_bin = os.path.join(win_sdk_dir, win_sdk_version_str,
+                                   'Bin', 'SetEnv.cmd')
     win_sdk_version_cmd = [win_sdk_version_bin, '-q',
                            '-version:{}'.format(win_sdk_version_str)]
 
