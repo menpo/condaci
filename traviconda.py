@@ -331,6 +331,8 @@ def conda_build_package_win_64bit(mc, path):
                                               echo_finished_win_cmd,
                                               conda_build_cmd,
                                               echo_finished_build_cmd]])
+    if sys.version_info.major == 3:
+        to_run = to_run.encode("utf-8")  # convert from string to bytes
     print(to_run)
     temp_conda_build_script_path = 'C:\{}.cmd'.format(uuid.uuid4())
     with open(temp_conda_build_script_path, 'wb') as f:
