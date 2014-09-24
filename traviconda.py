@@ -327,7 +327,7 @@ def conda_build_package_win_64bit(mc, path):
     to_run = '\n'.join([' '.join(c) for c in [win_sdk_version_cmd,
                                               win_sdk_set_env_cmd,
                                               ['ECHO',
-                                               'finished setting env, about to build']
+                                               'finished setting env, about to build'],
                                               conda_build_cmd, ['ECHO',
                                                                 'finished conda build']]])
     print(to_run)
