@@ -336,7 +336,7 @@ def configure_win_sdk_64bit():
     with open(temp_conda_build_script_path, 'wb') as f:
         f.write(to_run)
 
-    execute(['cmd.exe', '/C', to_run], verbose=True)
+    execute(['cmd.exe', '/C', '"' + to_run + '"'], verbose=True)
 
 
 def build_conda_package(mc, path):
