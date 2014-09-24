@@ -331,8 +331,8 @@ def conda_build_package_win_64bit(mc, path):
     temp_conda_build_script_path = 'C:\{}.cmd'.format(uuid.uuid4())
     with open(temp_conda_build_script_path, 'wb') as f:
         f.write(to_run)
-    execute(['cmd', '/E:ON', '/V:ON', '/C', temp_conda_build_script_path],
-            verbose=True)
+    print(subprocess.check_output(['cmd', '/E:ON', '/V:ON', '/C',
+                                   temp_conda_build_script_path]))
 
 
 def build_conda_package(mc, path):
