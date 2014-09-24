@@ -318,14 +318,17 @@ def conda_build_package_win_64bit(mc, path):
 
     win_sdk_set_env_cmd = [win_set_env_bin, '/x64', '/release']
 
-    conda_build_cmd = ['"{}"'.format(conda(mc)), 'build', '-q', path]
+    conda_build_cmd = ['call', '"{}"'.format(conda(mc)), 'build', '-q',
+                       path, '||', 'EXIT', '1']
 
     os.environ['MSSdk'] = '1'
     os.environ['DISTUTILS_USE_SDK'] = '1'
 
     to_run = '\n'.join([' '.join(c) for c in [win_sdk_version_cmd,
                                               win_sdk_set_env_cmd,
-                                              conda_build_cmd, ['echo',
+                                              ['ECHO',
+                                               'finished setting env, about to build']
+                                              conda_build_cmd, ['ECHO',
                                                                 'finished conda build']]])
     print(to_run)
     temp_conda_build_script_path = 'C:\{}.cmd'.format(uuid.uuid4())
