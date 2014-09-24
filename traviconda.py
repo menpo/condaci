@@ -111,6 +111,7 @@ def execute(cmd, verbose=True, env_additions=None):
             print('Additional environment variables: '
                   '{}'.format(', '.join(['{}={}'.format(k, v)
                                          for k, v in env_additions.items()])))
+    env_for_p_b4 = env_for_p.copy()
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, env=env_for_p)
     sentinal = ''
@@ -124,6 +125,11 @@ def execute(cmd, verbose=True, env_additions=None):
             sys.stdout.write(line)
             sys.stdout.flush()
     output = proc.communicate()[0]
+    env_diff = set(env_for_p_b4.items()) - set(env_for_p.items())
+    if len(env_diff) > 0:
+        print('process changed environment!')
+    else:
+        print('environment was unchanged by process')
     if proc.returncode == 0:
         return output
     else:
