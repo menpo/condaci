@@ -325,15 +325,15 @@ def configure_win_sdk_64bit():
     os.environ['DISTUTILS_USE_SDK'] = '1'
     final_cmd = ['call', 'dir', '||', 'EXIT', '1']
 
-    to_run = '\n'.join([' '.join(c) for c in [win_sdk_version_cmd,
-                                              win_sdk_set_env_cmd,
-                                              final_cmd]])
+    to_run = ' && '.join([' '.join(c) for c in [win_sdk_version_cmd,
+                                                win_sdk_set_env_cmd,
+                                                final_cmd]])
     print(to_run)
     temp_conda_build_script_path = 'C:\{}.cmd'.format(uuid.uuid4())
     with open(temp_conda_build_script_path, 'wb') as f:
         f.write(to_run)
 
-    execute(['cmd.exe', temp_conda_build_script_path], verbose=True)
+    execute(['cmd.exe', '/C', to_run], verbose=True)
 
 
 def build_conda_package(mc, path):
