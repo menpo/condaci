@@ -294,7 +294,7 @@ def setup_miniconda(python_version, installation_path, channel=None):
         print("No channels have been configured (all dependencies have to be "
               "sourced from anaconda)")
     execute_sequence(*cmds)
-
+    
 
 def configure_win_sdk_64bit():
     win_sdk_dir = 'C:\Program Files\Microsoft SDKs\Windows'
