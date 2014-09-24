@@ -323,6 +323,7 @@ def win_64bit_conda_build(final_cmd):
 
     to_run = '\n'.join([' '.join(c) for c in [win_sdk_version_cmd,
                                               win_sdk_set_env_cmd, final_cmd]])
+    print(to_run)
     temp_conda_build_script_path = 'C:\{}.cmd'.format(uuid.uuid4())
     with open(temp_conda_build_script_path, 'wb') as f:
         f.write(to_run)
