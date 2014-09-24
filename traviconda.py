@@ -113,7 +113,7 @@ def execute(cmd, verbose=True, env_additions=None):
                                          for k, v in env_additions.items()])))
     env_for_p_b4 = env_for_p.copy()
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT, env=env_for_p, shell=True)
+                            stderr=subprocess.STDOUT, env=env_for_p)
     sentinal = ''
     if sys.version_info.major == 3:
         sentinal = b''
@@ -328,7 +328,7 @@ def configure_win_sdk_64bit():
     os.environ['DISTUTILS_USE_SDK'] = '1'
     final_cmd = ['call', 'dir', '||', 'EXIT', '1']
 
-    to_run = '\n'.join([' '.join(c) for c in [win_sdk_version_cmd,
+    to_run = ' && '.join([' '.join(c) for c in [win_sdk_version_cmd,
                                                 win_sdk_set_env_cmd,
                                                 final_cmd]])
     print(to_run)
@@ -336,7 +336,7 @@ def configure_win_sdk_64bit():
     with open(temp_conda_build_script_path, 'wb') as f:
         f.write(to_run)
 
-    execute([temp_conda_build_script_path], verbose=True)
+    execute(['cmd.exe', '/C', to_run], verbose=True)
 
 
 def build_conda_package(mc, path):
