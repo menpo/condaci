@@ -158,6 +158,7 @@ def login():
 class LetMeIn:
     def __init__(self, key):
         self.token = key
+        self.site = False
 
 
 def login_with_key(key):
