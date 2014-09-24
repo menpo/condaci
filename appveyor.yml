@@ -12,5 +12,6 @@ platform:
 - x64
 
 install:
+- git version
 - ps: Start-FileDownload 'https://raw.githubusercontent.com/jabooth/traviconda/master/traviconda.py' C:\\traviconda.py; echo "Done"
-- cmd: python C:\\traviconda.py setup %PYTHON_VERSION% --channel %BINSTAR_USER%
+- python C:\\traviconda.py setup %PYTHON_VERSION% --channel %BINSTAR_USER%
