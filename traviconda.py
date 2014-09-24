@@ -339,13 +339,12 @@ def build_conda_package(mc, path):
             print('found BINSTAR_KEY in environment on Windows - deleting to '
                   'stop vcvarsall from telling the world')
             del os.environ['BINSTAR_KEY']
-        if host_arch == 'x64':
+        if host_arch == '64bit':
             print('running on 64 bit Windows - configuring Windows SDK before'
                   ' building')
-            win_64bit_conda_build(conda_cmd)
-    else:
-        # most of the time we are happy to just run conda build as normal
-        execute(conda_cmd)
+            return win_64bit_conda_build(conda_cmd)
+    # most of the time we are happy to just run conda build as normal
+    execute(conda_cmd)
 
 
 def get_conda_build_path(path):
