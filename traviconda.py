@@ -296,7 +296,7 @@ def setup_miniconda(python_version, installation_path, channel=None):
     execute_sequence(*cmds)
 
 
-def win_64bit_conda_build(final_cmd):
+def conda_build_package_win_64bit(mc, path):
     win_sdk_dir = 'C:\Program Files\Microsoft SDKs\Windows'
     if sys.version_info.major == 2:
         win_sdk_version_str = "v7.0"
@@ -318,11 +318,15 @@ def win_64bit_conda_build(final_cmd):
 
     win_sdk_set_env_cmd = [win_set_env_bin, '/x64', '/release']
 
+    conda_build_cmd = ['"{}"'.format(conda(mc)), 'build', '-q', path]
+
     os.environ['MSSdk'] = '1'
     os.environ['DISTUTILS_USE_SDK'] = '1'
 
     to_run = '\n'.join([' '.join(c) for c in [win_sdk_version_cmd,
-                                              win_sdk_set_env_cmd, final_cmd]])
+                                              win_sdk_set_env_cmd,
+                                              conda_build_cmd, ['echo',
+                                                                'finished conda build']]])
     print(to_run)
     temp_conda_build_script_path = 'C:\{}.cmd'.format(uuid.uuid4())
     with open(temp_conda_build_script_path, 'wb') as f:
@@ -332,8 +336,6 @@ def win_64bit_conda_build(final_cmd):
 
 
 def build_conda_package(mc, path):
-    # prepare the usual conda build command
-    conda_cmd = [conda(mc), 'build', '-q', path]
     print('Building package at path {}'.format(path))
     if host_platform == 'Windows':
         if 'BINSTAR_KEY' in os.environ:
@@ -343,9 +345,9 @@ def build_conda_package(mc, path):
         if host_arch == '64bit':
             print('running on 64 bit Windows - configuring Windows SDK before'
                   ' building')
-            return win_64bit_conda_build(conda_cmd)
+            return conda_build_package_win_64bit(mc, path)
     # most of the time we are happy to just run conda build as normal
-    execute(conda_cmd)
+    execute([conda(mc), 'build', '-q', path])
 
 
 def get_conda_build_path(path):
