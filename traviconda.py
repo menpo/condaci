@@ -331,13 +331,14 @@ def configure_win_sdk_64bit():
     first = ['set']
 
     to_run = '\n'.join([' '.join(c) for c in [first, win_sdk_version_cmd,
-                                              win_sdk_set_env_cmd]])
+                                              win_sdk_set_env_cmd, first]])
     print(to_run)
     temp_conda_build_script_path = 'C:\{}.cmd'.format(uuid.uuid4())
     with open(temp_conda_build_script_path, 'wb') as f:
         f.write(to_run)
 
-    vars = subprocess.check_output([temp_conda_build_script_path], shell=True)
+    vars = subprocess.check_output(['cmd', '/E:ON', '/V:ON', '/C',
+                                    temp_conda_build_script_path])
     print vars
 
 

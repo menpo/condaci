@@ -13,6 +13,6 @@ platform:
 
 install:
 - git version
-- cmd /E:ON /V:ON /C "C:\Program Files\Microsoft SDKs\Windows\v7.0\Setup\WindowsSdkVer.exe" -q -version:v7.0
-- cmd /E:ON /V:ON /C "C:\Program Files\Microsoft SDKs\Windows\v7.0\Bin\SetEnv.cmd" /x64 /release
-#- python traviconda.py setup %PYTHON_VERSION% --channel %BINSTAR_USER%
+#- cmd /E:ON /V:ON /C "C:\Program Files\Microsoft SDKs\Windows\v7.0\Setup\WindowsSdkVer.exe" -q -version:v7.0
+#- cmd /E:ON /V:ON /C "C:\Program Files\Microsoft SDKs\Windows\v7.0\Bin\SetEnv.cmd" /x64 /release
+- python traviconda.py setup %PYTHON_VERSION% --channel %BINSTAR_USER%
