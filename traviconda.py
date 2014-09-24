@@ -337,9 +337,8 @@ def configure_win_sdk_64bit():
     with open(temp_conda_build_script_path, 'wb') as f:
         f.write(to_run)
 
-    vars = subprocess.check_output(['cmd', '/E:ON', '/V:ON', '/C',
-                                    temp_conda_build_script_path])
-    print vars
+    execute(['cmd', '/E:ON', '/V:ON', '/C', temp_conda_build_script_path],
+            verbose=True)
 
 
 def build_conda_package(mc, path):
