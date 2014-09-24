@@ -302,7 +302,7 @@ def setup_miniconda(python_version, installation_path, channel=None):
     execute_sequence(*cmds)
 
 
-def configure_win_sdk_64bit():
+def win_64bit_conda_build(final_cmd):
     win_sdk_dir = 'C:\Program Files\Microsoft SDKs\Windows'
     if sys.version_info.major == 2:
         win_sdk_version_str = "v7.0"
@@ -326,22 +326,19 @@ def configure_win_sdk_64bit():
 
     os.environ['MSSdk'] = '1'
     os.environ['DISTUTILS_USE_SDK'] = '1'
-    final_cmd = ['call', 'dir']
 
-    first = ['set']
-
-    to_run = '\n'.join([' '.join(c) for c in [first, win_sdk_version_cmd,
-                                              win_sdk_set_env_cmd, first]])
-    print(to_run)
+    to_run = '\n'.join([' '.join(c) for c in [win_sdk_version_cmd,
+                                              win_sdk_set_env_cmd, final_cmd]])
     temp_conda_build_script_path = 'C:\{}.cmd'.format(uuid.uuid4())
     with open(temp_conda_build_script_path, 'wb') as f:
         f.write(to_run)
-
     execute(['cmd', '/E:ON', '/V:ON', '/C', temp_conda_build_script_path],
             verbose=True)
 
 
 def build_conda_package(mc, path):
+    # prepare the usual conda build command
+    conda_cmd = [conda(mc), 'build', '-q', path]
     print('Building package at path {}'.format(path))
     if host_platform == 'Windows':
         if 'BINSTAR_KEY' in os.environ:
@@ -349,9 +346,12 @@ def build_conda_package(mc, path):
                   'stop vcvarsall from telling the world')
             del os.environ['BINSTAR_KEY']
         if host_arch == 'x64':
-            print('running on 64 bit Windows - configuring Windows SDK')
-            configure_win_sdk_64bit()
-    execute([conda(mc), 'build', '-q', path])
+            print('running on 64 bit Windows - configuring Windows SDK before'
+                  ' building')
+            win_64bit_conda_build(conda_cmd)
+    else:
+        # most of the time we are happy to just run conda build as normal
+        execute(conda_cmd)
 
 
 def get_conda_build_path(path):
@@ -480,9 +480,8 @@ def git_head_has_tag():
 
 
 def setup_cmd(args):
-    configure_win_sdk_64bit()
-    # mc = resolve_mc(args.path)
-    # setup_miniconda(args.python, mc, channel=args.channel)
+    mc = resolve_mc(args.path)
+    setup_miniconda(args.python, mc, channel=args.channel)
 
 
 def build_cmd(args):
