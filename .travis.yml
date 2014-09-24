@@ -7,8 +7,8 @@ env:
   - PYTHON_VERSION=3
 
 script:
+- git version
 - python traviconda.py setup $PYTHON_VERSION
-- echo $(python traviconda.py version)
 - export PATH=/home/travis/miniconda/bin:$PATH
 
 notifications:
