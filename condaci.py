@@ -299,9 +299,6 @@ def setup_miniconda(python_version, installation_path, channel=None):
 
 
 def conda_build_package_win(mc, path):
-    print('downloading magical Windows SDK configuration'
-          ' script to {}'.format(run_with_env_cmd_path))
-    download_file(url_win_script, run_with_env_cmd_path)
     if 'BINSTAR_KEY' in os.environ:
         print('found BINSTAR_KEY in environment on Windows - deleting to '
               'stop vcvarsall from telling the world')
@@ -451,6 +448,10 @@ def git_head_has_tag():
 def setup_cmd(args):
     mc = resolve_mc(args.path)
     setup_miniconda(args.python, mc, channel=args.channel)
+    if host_platform == 'Windows':
+        print('downloading magical Windows SDK configuration'
+              ' script to {}'.format(run_with_env_cmd_path))
+        download_file(url_win_script, run_with_env_cmd_path)
 
 
 def build_cmd(args):
