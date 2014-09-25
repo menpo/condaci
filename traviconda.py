@@ -6,8 +6,6 @@ from functools import partial
 import platform as stdplatform
 import uuid
 import sys
-import itertools
-    
 
 
 def is_on_appveyor():
@@ -38,6 +36,8 @@ host_arch = detect_arch()
 pypi_upload_allowed = (host_platform == 'Linux' and
                        host_arch == '64bit' and
                        sys.version_info.major == 2)
+
+url_win_script = 'https://raw.githubusercontent.com/jabooth/python-appveyor-conda-example/master/continuous-integration/appveyor/run_with_env.cmd'
 
 
 def version_from_git_tags():
@@ -305,48 +305,54 @@ def setup_miniconda(python_version, installation_path, channel=None):
 
 
 def conda_build_package_win_64bit(mc, path):
-    win_sdk_dir = 'C:\Program Files\Microsoft SDKs\Windows'
-    if sys.version_info.major == 2:
-        win_sdk_version_str = "v7.0"
-    elif sys.version_info.major == 3:
-        win_sdk_version_str = "v7.1"
-    else:
-        raise ValueError('Unsupported major Python version')
-
-    win_sdk_version_bin = '"{}"'.format(os.path.join(win_sdk_dir,
-                                                     win_sdk_version_str,
-                                                     'Setup',
-                                                     'WindowsSdkVer.exe'))
-
-    win_set_env_bin = '"{}"'.format(os.path.join(win_sdk_dir,
-                                                 win_sdk_version_str,
-                                                 'Bin', 'SetEnv.cmd'))
-    win_sdk_version_cmd = [win_sdk_version_bin, '-q',
-                           '-version:{}'.format(win_sdk_version_str)]
-
-    win_sdk_set_env_cmd = [win_set_env_bin, '/x64', '/release']
-
-    conda_build_cmd = ['call', '"{}"'.format(conda(mc)), 'build', '-q',
-                       path, '||', 'EXIT', '1']
-
-    os.environ['MSSdk'] = '1'
-    os.environ['DISTUTILS_USE_SDK'] = '1'
-
-    echo_finished_win_cmd = ['ECHO', 'finished setting env, about to build']
-    echo_finished_build_cmd = ['ECHO', 'finished conda build']
-    to_run = '\n'.join([' '.join(c) for c in [win_sdk_version_cmd,
-                                              conda_build_cmd,
-                                              win_sdk_set_env_cmd,
-                                              echo_finished_win_cmd,
-                                              echo_finished_build_cmd]])
-    if sys.version_info.major == 3:
-        to_run = to_run.encode("utf-8")  # convert from string to bytes
-    print(to_run)
     temp_conda_build_script_path = 'C:\{}.cmd'.format(uuid.uuid4())
-    with open(temp_conda_build_script_path, 'wb') as f:
-        f.write(to_run)
+    print('downloading magical Windows SDK configuration script')
+    download_file(url_win_script, temp_conda_build_script_path)
+    # script expects PYTHON_VERSION set to either 2.7/3.4
+    if sys.version_info.major == 2:
+        os.environ['PYTHON_VERSION'] = '2.7'
+    elif sys.version_info.major == 3:
+        os.environ['PYTHON_VERSION'] = '3.4'
+    # win_sdk_dir = 'C:\Program Files\Microsoft SDKs\Windows'
+    # if sys.version_info.major == 2:
+    #     win_sdk_version_str = "v7.0"
+    # elif sys.version_info.major == 3:
+    #     win_sdk_version_str = "v7.1"
+    # else:
+    #     raise ValueError('Unsupported major Python version')
+    #
+    # win_sdk_version_bin = '"{}"'.format(os.path.join(win_sdk_dir,
+    #                                                  win_sdk_version_str,
+    #                                                  'Setup',
+    #                                                  'WindowsSdkVer.exe'))
+    #
+    # win_set_env_bin = '"{}"'.format(os.path.join(win_sdk_dir,
+    #                                              win_sdk_version_str,
+    #                                              'Bin', 'SetEnv.cmd'))
+    # win_sdk_version_cmd = [win_sdk_version_bin, '-q',
+    #                        '-version:{}'.format(win_sdk_version_str)]
+    #
+    # win_sdk_set_env_cmd = [win_set_env_bin, '/x64', '/release']
+
+    # conda_build_cmd = ['call', '"{}"'.format(conda(mc)), 'build', '-q',
+    #                    path, '||', 'EXIT', '1']
+    #
+    # os.environ['MSSdk'] = '1'
+    # os.environ['DISTUTILS_USE_SDK'] = '1'
+
+    # echo_finished_win_cmd = ['ECHO', 'finished setting env, about to build']
+    # echo_finished_build_cmd = ['ECHO', 'finished conda build']
+    # to_run = '\n'.join([' '.join(c) for c in [win_sdk_version_cmd,
+    #                                           win_sdk_set_env_cmd]])
+    # if sys.version_info.major == 3:
+    #     to_run = to_run.encode("utf-8")  # convert from string to bytes
+    # print(to_run)
+    # temp_conda_build_script_path = 'C:\{}.cmd'.format(uuid.uuid4())
+    # with open(temp_conda_build_script_path, 'wb') as f:
+    #     f.write(to_run)
     print(subprocess.check_output(['cmd', '/E:ON', '/V:ON', '/C',
-                                   temp_conda_build_script_path]))
+                                   temp_conda_build_script_path,
+                                   conda(mc), 'build', '-q', path]))
 
 
 def build_conda_package(mc, path):
