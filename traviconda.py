@@ -115,6 +115,7 @@ def execute(cmd, verbose=True, env_additions=None):
                                          for k, v in env_additions.items()])))
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, env=env_for_p)
+    print('opened process for cmd:{} with pid: {}'.format(cmd, proc.pid))
     sentinal = ''
     if sys.version_info.major == 3:
         sentinal = b''
@@ -125,8 +126,13 @@ def execute(cmd, verbose=True, env_additions=None):
                 line = line.decode("utf-8")
             sys.stdout.write(line)
             sys.stdout.flush()
+    print('{}: no more new lines, waiting to terminate'.format(proc.pid))
     output = proc.communicate()[0]
+    print('{} should have terminated fully. Final output is {}'.format(proc.pid, output))
+    sys.stdout.write(output)
+    sys.stdout.flush()
     if proc.returncode == 0:
+        print('return code on {} is 0 process should have ended'.format(proc.pid))
         return output
     else:
         e = subprocess.CalledProcessError(proc.returncode, cmd, output=output)
