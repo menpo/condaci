@@ -115,7 +115,6 @@ def execute(cmd, verbose=True, env_additions=None):
                                          for k, v in env_additions.items()])))
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, env=env_for_p)
-    print('opened process for cmd:{} with pid: {}'.format(cmd, proc.pid))
     sentinal = ''
     if sys.version_info.major == 3:
         sentinal = b''
@@ -126,14 +125,9 @@ def execute(cmd, verbose=True, env_additions=None):
                 line = line.decode("utf-8")
             sys.stdout.write(line)
             sys.stdout.flush()
-    print('{}: no more new lines, waiting to terminate'.format(proc.pid))
     output = proc.communicate()[0]
-    print('{} should have terminated fully. Final output is {}'.format(proc.pid, output))
-    sys.stdout.write(output)
-    sys.stdout.flush()
     if proc.returncode == 0:
-        print('return code on {} is 0 process should have ended'.format(proc.pid))
-        return output
+        return
     else:
         e = subprocess.CalledProcessError(proc.returncode, cmd, output=output)
         print(' -> {}'.format(e.output))
@@ -313,6 +307,10 @@ def conda_build_package_win(mc, path):
     #     os.environ['PYTHON_VERSION'] = '2.7'
     # elif sys.version_info.major == 3:
     #     os.environ['PYTHON_VERSION'] = '3.4'
+    if 'BINSTAR_KEY' in os.environ:
+        print('found BINSTAR_KEY in environment on Windows - deleting to '
+              'stop vcvarsall from telling the world')
+        del os.environ['BINSTAR_KEY']
     os.environ['PYTHON_ARCH'] = host_arch[:2]
     print('arch is {}'.format(os.environ['PYTHON_ARCH']))
     # win_sdk_dir = 'C:\Program Files\Microsoft SDKs\Windows'
@@ -352,19 +350,13 @@ def conda_build_package_win(mc, path):
     # temp_conda_build_script_path = 'C:\{}.cmd'.format(uuid.uuid4())
     # with open(temp_conda_build_script_path, 'wb') as f:
     #     f.write(to_run)
-    print(subprocess.check_output(['cmd', '/E:ON', '/V:ON', '/C',
-                                   r"C:\run_with_env.cmd",
-                                   r"C:\Miniconda\Scripts\conda",
-                                   "build", path]))
+    execute(['cmd', '/E:ON', '/V:ON', '/C', r"C:\run_with_env.cmd",
+             r"C:\Miniconda\Scripts\conda", "build", path])
 
 
 def build_conda_package(mc, path):
     print('Building package at path {}'.format(path))
     if host_platform == 'Windows':
-        # if 'BINSTAR_KEY' in os.environ:
-        #     print('found BINSTAR_KEY in environment on Windows - deleting to '
-        #           'stop vcvarsall from telling the world')
-        #     del os.environ['BINSTAR_KEY']
         conda_build_package_win(mc, path)
     else:
         execute([conda(mc), 'build', '-q', path])
