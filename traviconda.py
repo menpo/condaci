@@ -353,7 +353,9 @@ def conda_build_package_win(mc, path):
     # with open(temp_conda_build_script_path, 'wb') as f:
     #     f.write(to_run)
     print(subprocess.check_output(['cmd', '/E:ON', '/V:ON', '/C',
-                                   "C:\\run_with_env.cmd C:\\Miniconda\\Scripts\\conda build {}".format(path)]))
+                                   "C:\run_with_env.cmd",
+                                   "C:\Miniconda\Scripts\conda",
+                                   "build", path]))
 
 
 def build_conda_package(mc, path):
