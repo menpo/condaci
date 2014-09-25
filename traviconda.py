@@ -500,7 +500,7 @@ def setup_cmd(args):
     setup_miniconda(args.python, mc, channel=args.channel)
     if host_platform == 'Windows':
         print('downloading magical Windows SDK configuration script')
-        download_file(url_win_script, 'C:\cmd_in_env.cmd')
+        download_file(url_win_script, 'C:\crun_with_env.cmd')
 
 
 def build_cmd(args):
