@@ -8,10 +8,9 @@ environment:
     - PYTHON_VERSION: 3
 
 platform:
-#- x86
+- x86
 - x64
 
 install:
 - git version
-- cmd /E:ON /V:ON /C ""C:\Program Files\Microsoft SDKs\Windows\v7.0\Setup\WindowsSdkVer.exe" -q -version:v7.0 || "C:\Program Files\Microsoft SDKs\Windows\v7.0\Bin\SetEnv.cmd" /x64 /release || C:\Miniconda\Scripts\conda build -q ./conda || EXIT 1"
-- python traviconda.py setup %PYTHON_VERSION% --channel %BINSTAR_USER%
+- python condaci.py setup %PYTHON_VERSION% --channel %BINSTAR_USER%

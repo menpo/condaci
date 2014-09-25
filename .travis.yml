@@ -1,6 +1,3 @@
-os:
-- linux
-
 env:
   matrix:
   - PYTHON_VERSION=2
@@ -8,8 +5,7 @@ env:
 
 script:
 - git version
-- python traviconda.py setup $PYTHON_VERSION
-- export PATH=/home/travis/miniconda/bin:$PATH
+- python condaci.py setup $PYTHON_VERSION
 
 notifications:
   email: false
