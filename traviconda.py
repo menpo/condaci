@@ -6,6 +6,8 @@ from functools import partial
 import platform as stdplatform
 import uuid
 import sys
+import itertools
+    
 
 
 def is_on_appveyor():
@@ -327,9 +329,9 @@ def conda_build_package_win_64bit(mc, path):
     echo_finished_win_cmd = ['ECHO', 'finished setting env, about to build']
     echo_finished_build_cmd = ['ECHO', 'finished conda build']
     to_run = '\n'.join([' '.join(c) for c in [win_sdk_version_cmd,
+                                              conda_build_cmd,
                                               win_sdk_set_env_cmd,
                                               echo_finished_win_cmd,
-                                              conda_build_cmd,
                                               echo_finished_build_cmd]])
     if sys.version_info.major == 3:
         to_run = to_run.encode("utf-8")  # convert from string to bytes
