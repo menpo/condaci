@@ -357,15 +357,15 @@ def conda_build_package_win_64bit(mc, path):
 
 def build_conda_package(mc, path):
     print('Building package at path {}'.format(path))
-    if host_platform == 'Windows':
-        if 'BINSTAR_KEY' in os.environ:
-            print('found BINSTAR_KEY in environment on Windows - deleting to '
-                  'stop vcvarsall from telling the world')
-            del os.environ['BINSTAR_KEY']
-        if host_arch == '64bit':
-            print('running on 64 bit Windows - configuring Windows SDK before'
-                  ' building')
-            return conda_build_package_win_64bit(mc, path)
+    # if host_platform == 'Windows':
+        # if 'BINSTAR_KEY' in os.environ:
+        #     print('found BINSTAR_KEY in environment on Windows - deleting to '
+        #           'stop vcvarsall from telling the world')
+        #     del os.environ['BINSTAR_KEY']
+        # if host_arch == '64bit':
+        #     print('running on 64 bit Windows - configuring Windows SDK before'
+        #           ' building')
+        #     return conda_build_package_win_64bit(mc, path)
     # most of the time we are happy to just run conda build as normal
     execute([conda(mc), 'build', '-q', path])
 
@@ -498,6 +498,9 @@ def git_head_has_tag():
 def setup_cmd(args):
     mc = resolve_mc(args.path)
     setup_miniconda(args.python, mc, channel=args.channel)
+    if host_platform == 'Windows':
+        print('downloading magical Windows SDK configuration script')
+        download_file(url_win_script, 'C:\cmd_in_env.cmd')
 
 
 def build_cmd(args):
