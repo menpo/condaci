@@ -304,15 +304,17 @@ def setup_miniconda(python_version, installation_path, channel=None):
     execute_sequence(*cmds)
 
 
-def conda_build_package_win_64bit(mc, path):
-    temp_conda_build_script_path = 'C:\{}.cmd'.format(uuid.uuid4())
-    print('downloading magical Windows SDK configuration script')
-    download_file(url_win_script, temp_conda_build_script_path)
+def conda_build_package_win(mc, path):
+    # temp_conda_build_script_path = 'C:\{}.cmd'.format(uuid.uuid4())
+    # print('downloading magical Windows SDK configuration script')
+    # download_file(url_win_script, temp_conda_build_script_path)
     # script expects PYTHON_VERSION set to either 2.7/3.4
-    if sys.version_info.major == 2:
-        os.environ['PYTHON_VERSION'] = '2.7'
-    elif sys.version_info.major == 3:
-        os.environ['PYTHON_VERSION'] = '3.4'
+    # if sys.version_info.major == 2:
+    #     os.environ['PYTHON_VERSION'] = '2.7'
+    # elif sys.version_info.major == 3:
+    #     os.environ['PYTHON_VERSION'] = '3.4'
+    os.environ['PYTHON_ARCH'] = host_arch[:2]
+    print('arch is {}'.format(os.environ['PYTHON_ARCH']))
     # win_sdk_dir = 'C:\Program Files\Microsoft SDKs\Windows'
     # if sys.version_info.major == 2:
     #     win_sdk_version_str = "v7.0"
@@ -351,23 +353,19 @@ def conda_build_package_win_64bit(mc, path):
     # with open(temp_conda_build_script_path, 'wb') as f:
     #     f.write(to_run)
     print(subprocess.check_output(['cmd', '/E:ON', '/V:ON', '/C',
-                                   temp_conda_build_script_path,
-                                   conda(mc), 'build', '-q', path]))
+                                   "C:\\run_with_env.cmd C:\\Miniconda\\Scripts\\conda build {}".format(path)]))
 
 
 def build_conda_package(mc, path):
     print('Building package at path {}'.format(path))
-    # if host_platform == 'Windows':
+    if host_platform == 'Windows':
         # if 'BINSTAR_KEY' in os.environ:
         #     print('found BINSTAR_KEY in environment on Windows - deleting to '
         #           'stop vcvarsall from telling the world')
         #     del os.environ['BINSTAR_KEY']
-        # if host_arch == '64bit':
-        #     print('running on 64 bit Windows - configuring Windows SDK before'
-        #           ' building')
-        #     return conda_build_package_win_64bit(mc, path)
-    # most of the time we are happy to just run conda build as normal
-    execute([conda(mc), 'build', '-q', path])
+        conda_build_package_win(mc, path)
+    else:
+        execute([conda(mc), 'build', '-q', path])
 
 
 def get_conda_build_path(path):
