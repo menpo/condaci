@@ -38,7 +38,7 @@ pypi_upload_allowed = (host_platform == 'Linux' and
                        sys.version_info.major == 2)
 
 url_win_script = 'https://raw.githubusercontent.com/jabooth/python-appveyor-conda-example/master/continuous-integration/appveyor/run_with_env.cmd'
-
+run_with_env_cmd_path = r'C:\run_with_env.cmd'
 
 def version_from_git_tags():
     raw = subprocess.check_output(['git', 'describe', '--tags']).strip()
@@ -499,8 +499,9 @@ def setup_cmd(args):
     mc = resolve_mc(args.path)
     setup_miniconda(args.python, mc, channel=args.channel)
     if host_platform == 'Windows':
-        print('downloading magical Windows SDK configuration script')
-        download_file(url_win_script, 'C:\crun_with_env.cmd')
+        print('downloading magical Windows SDK configuration'
+              ' script to {}'.format(run_with_env_cmd_path))
+        download_file(url_win_script, run_with_env_cmd_path)
 
 
 def build_cmd(args):
