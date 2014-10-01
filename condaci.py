@@ -49,9 +49,9 @@ def version_from_git_tags():
 
 
 try:
-    os.environ['TC_PACKAGE_VERSION'] = version_from_git_tags()
+    os.environ['CONDACI_VERSION'] = version_from_git_tags()
 except subprocess.CalledProcessError:
-    print('Warning - unable to set TC_PACKAGE_VERSION')
+    print('Warning - unable to set CONDACI_VERSION')
 
 pypirc_path = p.join(p.expanduser('~'), '.pypirc')
 
@@ -80,7 +80,7 @@ python = lambda mc: p.join(miniconda_script_dir(mc), 'python')
 
 
 def url_for_platform_version(platform, py_version, arch):
-    version = '3.6.0'
+    version = '3.7.0'
     base_url = 'http://repo.continuum.io/miniconda/Miniconda'
     platform_str = {'Linux': 'Linux',
                     'Darwin': 'MacOSX',
@@ -91,8 +91,10 @@ def url_for_platform_version(platform, py_version, arch):
            'Darwin': '.sh',
            'Windows': '.exe'}
 
-    if py_version == '3':
-        base_url = base_url + py_version
+    if py_version == '3.4':
+        base_url = base_url + '3'
+    elif py_version != '2.7':
+        raise ValueError("Python version must be '2.7 or '3.4'")
     return '-'.join([base_url, version,
                      platform_str[platform],
                      arch_str[arch]]) + ext[platform]
@@ -530,7 +532,7 @@ if __name__ == "__main__":
     subp = pa.add_subparsers()
 
     sp = subp.add_parser('setup', help='setup a miniconda environment')
-    sp.add_argument("python", choices=['2', '3'])
+    sp.add_argument("python", choices=['2.7', '3.4'])
     sp.add_argument('-p', '--path', help='the path to install miniconda to. '
                                          'If not provided defaults to {'
                                          '}'.format(default_miniconda_dir))
