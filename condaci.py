@@ -80,7 +80,7 @@ python = lambda mc: p.join(miniconda_script_dir(mc), 'python')
 
 
 def url_for_platform_version(platform, py_version, arch):
-    version = '3.7.0'
+    version = 'latest'
     base_url = 'http://repo.continuum.io/miniconda/Miniconda'
     platform_str = {'Linux': 'Linux',
                     'Darwin': 'MacOSX',
