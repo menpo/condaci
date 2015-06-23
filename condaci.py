@@ -263,7 +263,7 @@ def purge_old_files(b, user, channel, filepath):
         remove_file(b, old_file)
 
 
-# TRAVICONDA CONVENIENCE FUNCTIONS
+# CONDACI CONVENIENCE FUNCTIONS
 
 def acquire_miniconda(url, path_to_download):
     print('Downloading miniconda from {} to {}'.format(url, path_to_download))
