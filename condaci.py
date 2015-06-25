@@ -40,16 +40,60 @@ pypi_upload_allowed = (host_platform == 'Linux' and
 url_win_script = 'https://raw.githubusercontent.com/jabooth/python-appveyor-conda-example/master/continuous-integration/appveyor/run_with_env.cmd'
 run_with_env_cmd_path = r'C:\run_with_env.cmd'
 
+
+def dirs_containing_file(fname, root=os.curdir):
+    for path, dirs, files in os.walk(os.path.abspath(root)):
+        if fname in files:
+            yield path
+
+
+def versions_from_versioneer():
+    for dir_ in dirs_containing_file('_version.py'):
+        sys.path.insert(0, dir_)
+
+        try:
+            import _version
+            yield _version.get_versions()['version']
+        except Exception as e:
+            print(e)
+        finally:
+            if '_version' in sys.modules:
+                sys.modules.pop('_version')
+
+            sys.path.pop(0)
+
+
 def version_from_git_tags():
     raw = subprocess.check_output(['git', 'describe', '--tags']).strip()
     if sys.version_info.major == 3:
         # this always comes back as bytes. On Py3, convert to a string
         raw = raw.decode("utf-8")
-    return raw[1:].replace('-', '_')  # always return a string (guaranteed)
+    # git tags commonly start with a 'v' or 'V'
+    if raw[0].lower() == 'v':
+        raw = raw[1:]
+    try:
+        # raw of form 'VERSION-NCOMMITS-SHA - split it and rebuild in right way
+        v, n_commits, sha = raw.split('-')
+    except ValueError:
+        # this version string is not as expected.
+        print('warning - could not interpret version string from git - you '
+              'may have a non-PEP440 version string')
+        return raw
+    else:
+        return v + '+' + n_commits + '.' + sha
 
+# search for versioneer versions in our subdirs
+versions = list(versions_from_versioneer())
+
+if len(versions) == 1:
+    version = versions[0]
+    print('found single unambiguous versioneer version: {}'.format(version))
+else:
+    print('found no versioneer _version.py files - falling back to manual version')
+    version = version_from_git_tags()
 
 try:
-    os.environ['CONDACI_VERSION'] = version_from_git_tags()
+    os.environ['CONDACI_VERSION'] = version
 except subprocess.CalledProcessError:
     print('Warning - unable to set CONDACI_VERSION')
 
