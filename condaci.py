@@ -83,7 +83,7 @@ def version_from_git_tags():
         return v + '+' + n_commits + '.' + sha
 
 
-def set_condaci_version():
+def get_version():
     # search for versioneer versions in our subdirs
     versions = list(versions_from_versioneer())
 
@@ -93,9 +93,12 @@ def set_condaci_version():
     else:
         print('found no versioneer _version.py files - falling back to manual version')
         version = version_from_git_tags()
+    return version
 
+
+def set_condaci_version():
     try:
-        os.environ['CONDACI_VERSION'] = version
+        os.environ['CONDACI_VERSION'] = get_version()
     except subprocess.CalledProcessError:
         print('Warning - unable to set CONDACI_VERSION')
 
@@ -390,6 +393,12 @@ def binstar_upload_unchecked(mc, key, user, channel, path):
         raise subprocess.CalledProcessError(e.returncode, cmd)
 
 
+def is_dev_tag():
+    v = versions_from_versioneer()
+    ending = v.split('.')[-1]
+    return ending.startswith('dev')
+
+
 def binstar_upload_if_appropriate(mc, path, user, key, channel=None):
     if key is None:
         print('No binstar key provided')
@@ -400,6 +409,11 @@ def binstar_upload_if_appropriate(mc, path, user, key, channel=None):
         return
     print('Have a user ({}) and key - can upload if suitable'.format(user))
     # decide if we should attempt an upload
+
+    if is_dev_tag():
+        print('on a dev tag - will not upload to binstar')
+        return
+
     if resolve_can_upload_from_ci():
         if channel is None:
             print('resolving channel from CI/git tags')
@@ -523,7 +537,7 @@ def pypi_cmd(args):
 
 
 def version_cmd(_):
-    print(version_from_git_tags())
+    print(get_version())
 
 
 def auto_cmd(args):
@@ -613,7 +627,7 @@ if __name__ == "__main__":
     auto.set_defaults(func=auto_cmd)
 
     vp = subp.add_parser('version', help='print the version as reported by '
-                                         'git')
+                                         'versioneer or git')
     vp.set_defaults(func=version_cmd)
 
     args = pa.parse_args()
