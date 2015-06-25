@@ -394,7 +394,7 @@ def binstar_upload_unchecked(mc, key, user, channel, path):
 
 
 def is_dev_tag():
-    v = versions_from_versioneer()
+    v = get_version()
     ending = v.split('.')[-1]
     return ending.startswith('dev')
 
