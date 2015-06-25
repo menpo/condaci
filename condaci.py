@@ -82,20 +82,23 @@ def version_from_git_tags():
     else:
         return v + '+' + n_commits + '.' + sha
 
-# search for versioneer versions in our subdirs
-versions = list(versions_from_versioneer())
 
-if len(versions) == 1:
-    version = versions[0]
-    print('found single unambiguous versioneer version: {}'.format(version))
-else:
-    print('found no versioneer _version.py files - falling back to manual version')
-    version = version_from_git_tags()
+def set_condaci_version():
+    # search for versioneer versions in our subdirs
+    versions = list(versions_from_versioneer())
 
-try:
-    os.environ['CONDACI_VERSION'] = version
-except subprocess.CalledProcessError:
-    print('Warning - unable to set CONDACI_VERSION')
+    if len(versions) == 1:
+        version = versions[0]
+        print('found single unambiguous versioneer version: {}'.format(version))
+    else:
+        print('found no versioneer _version.py files - falling back to manual version')
+        version = version_from_git_tags()
+
+    try:
+        os.environ['CONDACI_VERSION'] = version
+    except subprocess.CalledProcessError:
+        print('Warning - unable to set CONDACI_VERSION')
+
 
 pypirc_path = p.join(p.expanduser('~'), '.pypirc')
 
@@ -360,6 +363,8 @@ def conda_build_package_win(mc, path):
 
 def build_conda_package(mc, path):
     print('Building package at path {}'.format(path))
+    print('Attempting to set CONDACI_VERSION environment variable')
+    set_condaci_version()
     if host_platform == 'Windows':
         conda_build_package_win(mc, path)
     else:
