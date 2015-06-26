@@ -272,8 +272,8 @@ configuration_from_filename = lambda fn: fn.split('-')[-1].split('.')[0]
 name_from_filename = lambda fn: fn.split('-')[0]
 version_from_filename = lambda fn: fn.split('-')[1]
 platform_from_filepath = lambda fp: p.split(p.split(fp)[0])[-1]
-version_is_tag = lambda v: '_' not in v
-
+version_is_tag = lambda v: '+' not in v
+same_version_different_build = lambda v1, v2: v2.startswith(v1.split('+')[0])
 
 def channels_for_user(b, user):
     return b.list_channels(user).keys()
@@ -308,7 +308,8 @@ def files_to_remove(b, user, channel, filepath):
             f.configuration == configuration and
             f.platform == platform_ and
             f.version != version and
-            not version_is_tag(f.version)]
+            not version_is_tag(f.version) and
+            same_version_different_build(version, f.version)]
 
 
 def purge_old_files(b, user, channel, filepath):
