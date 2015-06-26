@@ -371,10 +371,21 @@ def conda_build_package_win(mc, path):
              conda(mc), 'build', '-q', path])
 
 
-def build_conda_package(mc, path):
+def build_conda_package(mc, path, channel=None):
     print('Building package at path {}'.format(path))
     print('Attempting to set CONDACI_VERSION environment variable')
     set_condaci_version()
+
+    # add master channel if we are a development build only
+    if not (is_rc_tag() or version_is_tag(get_version())):
+        print('building a non-RC non-tag build - adding master channel.')
+        if channel is None:
+            print('warning - no channel provided - cannot add master channel')
+        else:
+            execute([conda(mc), 'config', '--add', 'channels', channel + '/channel/master'])
+    else:
+        print('building a RC or tag release - no master channel added.')
+
     if host_platform == 'Windows':
         conda_build_package_win(mc, path)
     else:
@@ -405,6 +416,11 @@ def is_dev_tag():
     ending = v.split('.')[-1]
     return ending.startswith('dev')
 
+# warning - this assumes up to 9 release candidates
+def is_rc_tag():
+    v = get_version()
+    return v.split('+')[0][:-1].endswith('rc')
+
 
 def binstar_upload_if_appropriate(mc, path, user, key, channel=None):
     if key is None:
@@ -419,6 +435,10 @@ def binstar_upload_if_appropriate(mc, path, user, key, channel=None):
 
     if is_dev_tag():
         print('on a dev tag - will not upload to binstar')
+        return
+
+    if is_rc_tag():
+        print('on an rc tag - will not upload to binstar')
         return
 
     if resolve_can_upload_from_ci():
@@ -549,7 +569,9 @@ def version_cmd(_):
 
 def auto_cmd(args):
     mc = resolve_mc(args.miniconda)
-    build_conda_package(mc, args.buildpath)
+    # this is a little menpo-specific, but we want to add the master channel
+    # when doing dev builds to source our other dev dependencies
+    build_conda_package(mc, args.buildpath, channel=args.binstaruser)
     print('successfully built conda package, proceeding to upload')
     binstar_upload_if_appropriate(mc, args.buildpath, args.binstaruser,
                                   args.binstarkey,
