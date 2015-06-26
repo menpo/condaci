@@ -6,6 +6,7 @@ from functools import partial
 import platform as stdplatform
 import uuid
 import sys
+from pprint import pprint
 
 
 def is_on_appveyor():
@@ -297,6 +298,11 @@ def files_to_remove(b, user, channel, filepath):
     all_files = files_on_channel(b, user, channel)
     # other versions of this exact setup that are not tagged versions should
     # be removed
+    print('Removing old releases matching:'
+          '\nname: {}\nconfiguration: {}\nplatform: {}'
+          '\nversion: {}'.format(name, configuration, platform_, version))
+    print('candidate releases are:')
+    pprint([f.all_info() for f in all_files])
     return [f for f in all_files if
             f.name == name and
             f.configuration == configuration and
