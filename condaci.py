@@ -9,14 +9,6 @@ import sys
 from pprint import pprint
 
 
-def is_on_appveyor():
-    return 'APPVEYOR' in os.environ
-
-
-def is_on_travis():
-    return 'TRAVIS' in os.environ
-
-
 def detect_arch():
     arch = stdplatform.architecture()[0]
     # need to be a little more sneaky to check the platform on Windows:
@@ -34,77 +26,10 @@ def detect_arch():
 
 host_platform = stdplatform.system()
 host_arch = detect_arch()
-pypi_upload_allowed = (host_platform == 'Linux' and
-                       host_arch == '64bit' and
-                       sys.version_info.major == 2)
 
 url_win_script = 'https://raw.githubusercontent.com/jabooth/python-appveyor-conda-example/master/continuous-integration/appveyor/run_with_env.cmd'
 run_with_env_cmd_path = r'C:\run_with_env.cmd'
 
-
-def dirs_containing_file(fname, root=os.curdir):
-    for path, dirs, files in os.walk(os.path.abspath(root)):
-        if fname in files:
-            yield path
-
-
-def versions_from_versioneer():
-    for dir_ in dirs_containing_file('_version.py'):
-        sys.path.insert(0, dir_)
-
-        try:
-            import _version
-            yield _version.get_versions()['version']
-        except Exception as e:
-            print(e)
-        finally:
-            if '_version' in sys.modules:
-                sys.modules.pop('_version')
-
-            sys.path.pop(0)
-
-
-def version_from_git_tags():
-    raw = subprocess.check_output(['git', 'describe', '--tags']).strip()
-    if sys.version_info.major == 3:
-        # this always comes back as bytes. On Py3, convert to a string
-        raw = raw.decode("utf-8")
-    # git tags commonly start with a 'v' or 'V'
-    if raw[0].lower() == 'v':
-        raw = raw[1:]
-    try:
-        # raw of form 'VERSION-NCOMMITS-SHA - split it and rebuild in right way
-        v, n_commits, sha = raw.split('-')
-    except ValueError:
-        # this version string is not as expected.
-        print('warning - could not interpret version string from git - you '
-              'may have a non-PEP440 version string')
-        return raw
-    else:
-        return v + '+' + n_commits + '.' + sha
-
-
-def get_version():
-    # search for versioneer versions in our subdirs
-    versions = list(versions_from_versioneer())
-
-    if len(versions) == 1:
-        version = versions[0]
-        print('found single unambiguous versioneer version: {}'.format(version))
-    else:
-        print('found no versioneer _version.py files - falling back to manual version')
-        version = version_from_git_tags()
-    return version
-
-
-def set_condaci_version():
-    try:
-        os.environ['CONDACI_VERSION'] = get_version()
-    except subprocess.CalledProcessError:
-        print('Warning - unable to set CONDACI_VERSION')
-
-
-pypirc_path = p.join(p.expanduser('~'), '.pypirc')
 
 # define our commands
 if host_platform == 'Windows':
@@ -117,38 +42,13 @@ else:
     temp_installer_path = p.expanduser('~/{}.sh'.format(uuid.uuid4()))
 
 
-
-miniconda_script_dir = lambda mc: p.join(mc, script_dir_name)
-
-conda = lambda mc: p.join(miniconda_script_dir(mc), 'conda')
-binstar = lambda mc: p.join(miniconda_script_dir(mc), 'binstar')
-python = lambda mc: p.join(miniconda_script_dir(mc), 'python')
-
 # Amazingly, adding these causes conda-build to fail parsing yaml. :-|
 #print('running on {} {}'.format(platform, arch))
 #print('miniconda_installer_path is {}'.format(miniconda_installer_path))
 #print('miniconda will be installed to {}'.format(miniconda_dir))
 
 
-def url_for_platform_version(platform, py_version, arch):
-    version = 'latest'
-    base_url = 'http://repo.continuum.io/miniconda/Miniconda'
-    platform_str = {'Linux': 'Linux',
-                    'Darwin': 'MacOSX',
-                    'Windows': 'Windows'}
-    arch_str = {'64bit': 'x86_64',
-                '32bit': 'x86'}
-    ext = {'Linux': '.sh',
-           'Darwin': '.sh',
-           'Windows': '.exe'}
-
-    if py_version == '3.4':
-        base_url = base_url + '3'
-    elif py_version != '2.7':
-        raise ValueError("Python version must be '2.7 or '3.4'")
-    return '-'.join([base_url, version,
-                     platform_str[platform],
-                     arch_str[arch]]) + ext[platform]
+# ------------------------------ UTILITIES ---------------------------------- #
 
 # forward stderr to stdout
 check = partial(subprocess.check_call, stderr=subprocess.STDOUT)
@@ -203,7 +103,203 @@ def download_file(url, path_to_download):
     fp.close()
 
 
-# BINSTAR LOGIN
+def dirs_containing_file(fname, root=os.curdir):
+    for path, dirs, files in os.walk(os.path.abspath(root)):
+        if fname in files:
+            yield path
+
+
+# ------------------------ MINICONDA INTEGRATION ---------------------------- #
+
+def url_for_platform_version(platform, py_version, arch):
+    version = 'latest'
+    base_url = 'http://repo.continuum.io/miniconda/Miniconda'
+    platform_str = {'Linux': 'Linux',
+                    'Darwin': 'MacOSX',
+                    'Windows': 'Windows'}
+    arch_str = {'64bit': 'x86_64',
+                '32bit': 'x86'}
+    ext = {'Linux': '.sh',
+           'Darwin': '.sh',
+           'Windows': '.exe'}
+
+    if py_version == '3.4':
+        base_url = base_url + '3'
+    elif py_version != '2.7':
+        raise ValueError("Python version must be '2.7 or '3.4'")
+    return '-'.join([base_url, version,
+                     platform_str[platform],
+                     arch_str[arch]]) + ext[platform]
+
+
+def acquire_miniconda(url, path_to_download):
+    print('Downloading miniconda from {} to {}'.format(url, path_to_download))
+    download_file(url, path_to_download)
+
+
+def install_miniconda(path_to_installer, path_to_install):
+    print('Installing miniconda to {}'.format(path_to_install))
+    if host_platform == 'Windows':
+        execute([path_to_installer, '/S', '/D={}'.format(path_to_install)])
+    else:
+        execute(['chmod', '+x', path_to_installer])
+        execute([path_to_installer, '-b', '-p', path_to_install])
+
+
+def setup_miniconda(python_version, installation_path, channel=None):
+    url = url_for_platform_version(host_platform, python_version, host_arch)
+    print('Setting up miniconda from URL {}'.format(url))
+    print("(Installing to '{}')".format(installation_path))
+    acquire_miniconda(url, temp_installer_path)
+    install_miniconda(temp_installer_path, installation_path)
+    # delete the installer now we are done
+    os.unlink(temp_installer_path)
+    conda_cmd = conda(installation_path)
+    cmds = [[conda_cmd, 'update', '-q', '--yes', 'conda'],
+            [conda_cmd, 'install', '-q', '--yes', 'conda-build', 'jinja2',
+             'binstar']]
+    if channel is not None:
+        print("(adding channel '{}' for dependencies)".format(channel))
+        cmds.append([conda_cmd, 'config', '--add', 'channels', channel])
+    else:
+        print("No channels have been configured (all dependencies have to be "
+              "sourced from anaconda)")
+    execute_sequence(*cmds)
+
+
+# handles to binaries from a miniconda install
+miniconda_script_dir = lambda mc: p.join(mc, script_dir_name)
+conda = lambda mc: p.join(miniconda_script_dir(mc), 'conda')
+binstar = lambda mc: p.join(miniconda_script_dir(mc), 'binstar')
+python = lambda mc: p.join(miniconda_script_dir(mc), 'python')
+
+
+# ------------------------ CONDA BUILD INTEGRATION -------------------------- #
+
+def get_conda_build_path(path):
+    from conda_build.metadata import MetaData
+    from conda_build.build import bldpkg_path
+    return bldpkg_path(MetaData(path))
+
+
+def conda_build_package_win(mc, path):
+    if 'BINSTAR_KEY' in os.environ:
+        print('found BINSTAR_KEY in environment on Windows - deleting to '
+              'stop vcvarsall from telling the world')
+        del os.environ['BINSTAR_KEY']
+    os.environ['PYTHON_ARCH'] = host_arch[:2]
+    os.environ['PYTHON_VERSION'] = '{}.{}'.format(sys.version_info.major,
+                                                  sys.version_info.minor)
+    print('PYTHON_ARCH={} PYTHON_VERSION={}'.format(os.environ['PYTHON_ARCH'],
+                                                    os.environ['PYTHON_VERSION']))
+    execute(['cmd', '/E:ON', '/V:ON', '/C', run_with_env_cmd_path,
+             conda(mc), 'build', '-q', path])
+
+
+def build_conda_package(mc, path, channel=None):
+    print('Building package at path {}'.format(path))
+    print('Attempting to set CONDACI_VERSION environment variable')
+    set_condaci_version()
+
+    # add master channel if we are a development build only
+    if not (is_rc_tag() or version_is_tag(get_version())):
+        print('building a non-RC non-tag build - adding master channel.')
+        if channel is None:
+            print('warning - no channel provided - cannot add master channel')
+        else:
+            execute([conda(mc), 'config', '--add', 'channels', channel + '/channel/master'])
+    else:
+        print('building a RC or tag release - no master channel added.')
+
+    if host_platform == 'Windows':
+        conda_build_package_win(mc, path)
+    else:
+        execute([conda(mc), 'build', '-q', path])
+
+
+# ------------------------- VERSIONING INTEGRATION -------------------------- #
+
+version_is_tag = lambda v: '+' not in v
+same_version_different_build = lambda v1, v2: v2.startswith(v1.split('+')[0])
+
+
+def versions_from_versioneer():
+    for dir_ in dirs_containing_file('_version.py'):
+        sys.path.insert(0, dir_)
+
+        try:
+            import _version
+            yield _version.get_versions()['version']
+        except Exception as e:
+            print(e)
+        finally:
+            if '_version' in sys.modules:
+                sys.modules.pop('_version')
+
+            sys.path.pop(0)
+
+
+def version_from_git_tags():
+    raw = subprocess.check_output(['git', 'describe', '--tags']).strip()
+    if sys.version_info.major == 3:
+        # this always comes back as bytes. On Py3, convert to a string
+        raw = raw.decode("utf-8")
+    # git tags commonly start with a 'v' or 'V'
+    if raw[0].lower() == 'v':
+        raw = raw[1:]
+    try:
+        # raw of form 'VERSION-NCOMMITS-SHA - split it and rebuild in right way
+        v, n_commits, sha = raw.split('-')
+    except ValueError:
+        # this version string is not as expected.
+        print('warning - could not interpret version string from git - you '
+              'may have a non-PEP440 version string')
+        return raw
+    else:
+        return v + '+' + n_commits + '.' + sha
+
+
+def get_version():
+    # search for versioneer versions in our subdirs
+    versions = list(versions_from_versioneer())
+
+    if len(versions) == 1:
+        version = versions[0]
+        print('found single unambiguous versioneer version: {}'.format(version))
+    else:
+        print('found no versioneer _version.py files - falling back to manual version')
+        version = version_from_git_tags()
+    return version
+
+
+def is_dev_tag():
+    v = get_version()
+    ending = v.split('.')[-1]
+    return ending.startswith('dev')
+
+
+# warning - this assumes up to 9 release candidates
+def is_rc_tag():
+    v = get_version()
+    return v.split('+')[0][:-1].endswith('rc')
+
+
+def git_head_has_tag():
+    try:
+        execute(['git', 'describe', '--exact-match', '--tags', 'HEAD'])
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
+def set_condaci_version():
+    try:
+        os.environ['CONDACI_VERSION'] = get_version()
+    except subprocess.CalledProcessError:
+        print('Warning - unable to set CONDACI_VERSION')
+
+
+# -------------------------- BINSTAR INTEGRATION ---------------------------- #
 
 def login():
     from binstar_client.utils import get_binstar
@@ -219,8 +315,6 @@ class LetMeIn:
 def login_with_key(key):
     from binstar_client.utils import get_binstar
     return get_binstar(args=LetMeIn(key))
-
-# BINSTAR FILE PURGING
 
 
 class BinstarFile(object):
@@ -272,8 +366,7 @@ configuration_from_filename = lambda fn: fn.split('-')[-1].split('.')[0]
 name_from_filename = lambda fn: fn.split('-')[0]
 version_from_filename = lambda fn: fn.split('-')[1]
 platform_from_filepath = lambda fp: p.split(p.split(fp)[0])[-1]
-version_is_tag = lambda v: '+' not in v
-same_version_different_build = lambda v1, v2: v2.startswith(v1.split('+')[0])
+
 
 def channels_for_user(b, user):
     return b.list_channels(user).keys()
@@ -320,84 +413,6 @@ def purge_old_files(b, user, channel, filepath):
         remove_file(b, old_file)
 
 
-# CONDACI CONVENIENCE FUNCTIONS
-
-def acquire_miniconda(url, path_to_download):
-    print('Downloading miniconda from {} to {}'.format(url, path_to_download))
-    download_file(url, path_to_download)
-
-
-def install_miniconda(path_to_installer, path_to_install):
-    print('Installing miniconda to {}'.format(path_to_install))
-    if host_platform == 'Windows':
-        execute([path_to_installer, '/S', '/D={}'.format(path_to_install)])
-    else:
-        execute(['chmod', '+x', path_to_installer])
-        execute([path_to_installer, '-b', '-p', path_to_install])
-
-
-def setup_miniconda(python_version, installation_path, channel=None):
-    url = url_for_platform_version(host_platform, python_version, host_arch)
-    print('Setting up miniconda from URL {}'.format(url))
-    print("(Installing to '{}')".format(installation_path))
-    acquire_miniconda(url, temp_installer_path)
-    install_miniconda(temp_installer_path, installation_path)
-    # delete the installer now we are done
-    os.unlink(temp_installer_path)
-    conda_cmd = conda(installation_path)
-    cmds = [[conda_cmd, 'update', '-q', '--yes', 'conda'],
-            [conda_cmd, 'install', '-q', '--yes', 'conda-build', 'jinja2',
-             'binstar']]
-    if channel is not None:
-        print("(adding channel '{}' for dependencies)".format(channel))
-        cmds.append([conda_cmd, 'config', '--add', 'channels', channel])
-    else:
-        print("No channels have been configured (all dependencies have to be "
-              "sourced from anaconda)")
-    execute_sequence(*cmds)
-
-
-def conda_build_package_win(mc, path):
-    if 'BINSTAR_KEY' in os.environ:
-        print('found BINSTAR_KEY in environment on Windows - deleting to '
-              'stop vcvarsall from telling the world')
-        del os.environ['BINSTAR_KEY']
-    os.environ['PYTHON_ARCH'] = host_arch[:2]
-    os.environ['PYTHON_VERSION'] = '{}.{}'.format(sys.version_info.major,
-                                                  sys.version_info.minor)
-    print('PYTHON_ARCH={} PYTHON_VERSION={}'.format(os.environ['PYTHON_ARCH'],
-                                                    os.environ['PYTHON_VERSION']))
-    execute(['cmd', '/E:ON', '/V:ON', '/C', run_with_env_cmd_path,
-             conda(mc), 'build', '-q', path])
-
-
-def build_conda_package(mc, path, channel=None):
-    print('Building package at path {}'.format(path))
-    print('Attempting to set CONDACI_VERSION environment variable')
-    set_condaci_version()
-
-    # add master channel if we are a development build only
-    if not (is_rc_tag() or version_is_tag(get_version())):
-        print('building a non-RC non-tag build - adding master channel.')
-        if channel is None:
-            print('warning - no channel provided - cannot add master channel')
-        else:
-            execute([conda(mc), 'config', '--add', 'channels', channel + '/channel/master'])
-    else:
-        print('building a RC or tag release - no master channel added.')
-
-    if host_platform == 'Windows':
-        conda_build_package_win(mc, path)
-    else:
-        execute([conda(mc), 'build', '-q', path])
-
-
-def get_conda_build_path(path):
-    from conda_build.metadata import MetaData
-    from conda_build.build import bldpkg_path
-    return bldpkg_path(MetaData(path))
-
-
 def binstar_upload_unchecked(mc, key, user, channel, path):
     try:
         # TODO - could this safely be co? then we would get the binstar error..
@@ -409,17 +424,6 @@ def binstar_upload_unchecked(mc, key, user, channel, path):
         cmd[2] = 'BINSTAR_KEY'
         # ...then raise the error
         raise subprocess.CalledProcessError(e.returncode, cmd)
-
-
-def is_dev_tag():
-    v = get_version()
-    ending = v.split('.')[-1]
-    return ending.startswith('dev')
-
-# warning - this assumes up to 9 release candidates
-def is_rc_tag():
-    v = get_version()
-    return v.split('+')[0][:-1].endswith('rc')
 
 
 def binstar_upload_if_appropriate(mc, path, user, key, channel=None):
@@ -463,6 +467,16 @@ def binstar_upload_and_purge(mc, key, user, channel, filepath):
         print("On main channel - no purging of releases will be done.")
 
 
+# -------------- CONTINUOUS INTEGRATION-SPECIFIC FUNCTIONALITY -------------- #
+
+def is_on_appveyor():
+    return 'APPVEYOR' in os.environ
+
+
+def is_on_travis():
+    return 'TRAVIS' in os.environ
+
+
 def resolve_can_upload_from_ci():
     # can upload as long as this isn't a PR
     if is_on_travis():
@@ -470,15 +484,17 @@ def resolve_can_upload_from_ci():
     elif is_on_appveyor():
         is_pr = is_pr_from_appveyor()
     else:
-        raise ValueError('Not on app veyor or travis so cant '
-                         'resolve whether we can upload')
+        raise ValueError("Not on appveyor or travis so can't "
+                         "resolve whether we can upload")
     can_upload = not is_pr
     print("Can we can upload? : {}".format(can_upload))
     return can_upload
 
-
 is_pr_from_travis = lambda: os.environ['TRAVIS_PULL_REQUEST'] != 'false'
 is_pr_from_appveyor = lambda: 'APPVEYOR_PULL_REQUEST_NUMBER' in os.environ
+
+branch_from_appveyor = lambda: os.environ['APPVEYOR_REPO_BRANCH']
+branch_from_travis = lambda: os.environ['TRAVIS_BRANCH']
 
 
 def binstar_channel_from_ci():
@@ -497,9 +513,12 @@ def binstar_channel_from_ci():
                          "decide on binstar channel")
 
 
-branch_from_appveyor = lambda: os.environ['APPVEYOR_REPO_BRANCH']
-branch_from_travis = lambda: os.environ['TRAVIS_BRANCH']
+# -------------------- [EXPERIMENTAL] PYPI INTEGRATION ---------------------- #
 
+pypirc_path = p.join(p.expanduser('~'), '.pypirc')
+pypi_upload_allowed = (host_platform == 'Linux' and
+                       host_arch == '64bit' and
+                       sys.version_info.major == 2)
 
 pypi_template = """[distutils]
 index-servers = pypi
@@ -529,12 +548,13 @@ def upload_to_pypi_if_appropriate(mc, username, password):
     execute_sequence([python(mc), 'setup.py', 'sdist', 'upload'])
 
 
-def git_head_has_tag():
-    try:
-        execute(['git', 'describe', '--exact-match', '--tags', 'HEAD'])
-        return True
-    except subprocess.CalledProcessError:
-        return False
+# --------------------------- ARGPARSE COMMANDS ----------------------------- #
+
+def resolve_mc(mc):
+    if mc is not None:
+        return mc
+    else:
+        return default_miniconda_dir
 
 
 def setup_cmd(args):
@@ -577,13 +597,6 @@ def auto_cmd(args):
                                   args.binstarkey,
                                   channel=args.binstarchannel)
     #upload_to_pypi_if_appropriate(mc, args.pypiuser, args.pypipassword)
-
-
-def resolve_mc(mc):
-    if mc is not None:
-        return mc
-    else:
-        return default_miniconda_dir
 
 
 def add_miniconda_parser(parser):
