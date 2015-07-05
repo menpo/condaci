@@ -428,7 +428,7 @@ def purge_old_binstar_files(b, user, channel, filepath):
     print("Found {} releases to remove".format(len(to_remove)))
     for old_file in to_remove:
         print("Removing '{}'".format(old_file))
-        binstar_remove_file(b, old_file)
+        # binstar_remove_file(b, old_file)
 
 
 def binstar_upload_unchecked(mc, key, user, channel, path):
