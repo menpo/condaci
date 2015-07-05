@@ -12,6 +12,8 @@ URL_WIN_SCRIPT = 'https://raw.githubusercontent.com/jabooth/python-appveyor-cond
 RUN_WITH_ENV_CMD_PATH = r'C:\run_with_env.cmd'
 
 
+RANDOM_UUID = uuid.uuid4()  # used for temp file
+
 # Amazingly, adding these causes conda-build to fail parsing yaml. :-|
 #print('running on {} {}'.format(platform, arch))
 #print('miniconda_installer_path is {}'.format(miniconda_installer_path))
@@ -123,8 +125,8 @@ def url_for_platform_version(platform, py_version, arch):
 
 
 def temp_installer_path():
-    return ('C:\{}.exe'.format(uuid.uuid4()) if host_platform() == 'Windows'
-            else p.expanduser('~/{}.sh'.format(uuid.uuid4())))
+    return ('C:\{}.exe'.format(RANDOM_UUID) if host_platform() == 'Windows'
+            else p.expanduser('~/{}.sh'.format(RANDOM_UUID)))
 
 
 def default_miniconda_dir():
