@@ -188,7 +188,7 @@ def get_conda_build_path(path):
     return bldpkg_path(MetaData(path))
 
 
-def _conda_build_package_win(mc, path):
+def conda_build_package_win(mc, path):
     if 'BINSTAR_KEY' in os.environ:
         print('found BINSTAR_KEY in environment on Windows - deleting to '
               'stop vcvarsall from telling the world')
@@ -207,9 +207,10 @@ def build_conda_package(mc, path, channel=None):
     print('Attempting to set CONDACI_VERSION environment variable')
     set_condaci_version()
 
-    # add master channel if we are a development build only
-    if not (is_rc_tag() or version_is_tag(get_version())):
-        print('building a non-RC non-tag build - adding master channel.')
+    # this is a little menpo-specific, but we want to add the master channel
+    # when doing dev builds to source our other dev dependencies
+    if is_tag_that_needs_master_channel():
+        print('building a non-RC non-release-tag build - adding master channel.')
         if channel is None:
             print('warning - no channel provided - cannot add master channel')
         else:
@@ -218,7 +219,7 @@ def build_conda_package(mc, path, channel=None):
         print('building a RC or tag release - no master channel added.')
 
     if host_platform() == 'Windows':
-        _conda_build_package_win(mc, path)
+        conda_build_package_win(mc, path)
     else:
         execute([conda(mc), 'build', '-q', path])
 
@@ -288,6 +289,16 @@ def is_dev_tag():
 def is_rc_tag():
     v = get_version()
     return v.split('+')[0][:-1].endswith('rc')
+
+
+def is_release_tag():
+    v = get_version()
+    is_a_tag = '+' not in v
+    return is_a_tag and not is_rc_tag() and not is_dev_tag()
+
+
+def is_tag_that_needs_master_channel():
+    return not (is_release_tag() or is_rc_tag())
 
 
 def git_head_has_tag():
@@ -484,16 +495,19 @@ def is_on_travis():
     return 'TRAVIS' in os.environ
 
 
-def resolve_can_upload_from_ci():
-    # can upload as long as this isn't a PR
+def is_pr_on_ci():
     if is_on_travis():
-        is_pr = is_pr_from_travis()
+        return is_pr_from_travis()
     elif is_on_appveyor():
-        is_pr = is_pr_from_appveyor()
+        return is_pr_from_appveyor()
     else:
         raise ValueError("Not on appveyor or travis so can't "
-                         "resolve whether we can upload")
-    can_upload = not is_pr
+                         "resolve whether we are on a PR or not")
+
+
+def resolve_can_upload_from_ci():
+    # can upload as long as this isn't a PR
+    can_upload = not is_pr_on_ci()
     print("Can we can upload? : {}".format(can_upload))
     return can_upload
 
@@ -504,20 +518,25 @@ branch_from_appveyor = lambda: os.environ['APPVEYOR_REPO_BRANCH']
 branch_from_travis = lambda: os.environ['TRAVIS_BRANCH']
 
 
-def binstar_channel_from_ci():
-    if git_head_has_tag():
-        # tagged releases always go to main
-        print("current head is a tagged release ({}), "
-              "uploading to 'main' channel".format(version_from_git_tags()))
-        return 'main'
+def branch_from_ci():
     if is_on_travis():
         return branch_from_travis()
     elif is_on_appveyor():
         return branch_from_appveyor()
     else:
-        raise ValueError("An untagged release, and we aren't on "
+        raise ValueError("We aren't on "
                          "Appveyor or Travis so can't "
-                         "decide on binstar channel")
+                         "decide on branch")
+
+
+def binstar_channel_from_ci():
+    if is_release_tag():
+        # tagged releases always go to main
+        print("current head is a tagged release ({}), "
+              "uploading to 'main' channel".format(get_version()))
+        return 'main'
+    else:
+        return branch_from_ci()
 
 
 # -------------------- [EXPERIMENTAL] PYPI INTEGRATION ---------------------- #
@@ -596,8 +615,6 @@ def version_cmd(_):
 
 def auto_cmd(args):
     mc = resolve_mc(args.miniconda)
-    # this is a little menpo-specific, but we want to add the master channel
-    # when doing dev builds to source our other dev dependencies
     build_conda_package(mc, args.buildpath, channel=args.binstaruser)
     print('successfully built conda package, proceeding to upload')
     binstar_upload_if_appropriate(mc, args.buildpath, args.binstaruser,
