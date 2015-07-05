@@ -8,38 +8,8 @@ import uuid
 import sys
 from pprint import pprint
 
-
-def detect_arch():
-    arch = stdplatform.architecture()[0]
-    # need to be a little more sneaky to check the platform on Windows:
-    # http://stackoverflow.com/questions/2208828/detect-64bit-os-windows-in-python
-    if host_platform == 'Windows':
-        if 'APPVEYOR' in os.environ:
-            av_platform = os.environ['PLATFORM']
-            if av_platform == 'x86':
-                arch = '32bit'
-            elif av_platform == 'x64':
-                arch = '64bit'
-            else:
-                print('Was unable to interpret the platform "{}"'.format())
-    return arch
-
-host_platform = stdplatform.system()
-host_arch = detect_arch()
-
-url_win_script = 'https://raw.githubusercontent.com/jabooth/python-appveyor-conda-example/master/continuous-integration/appveyor/run_with_env.cmd'
-run_with_env_cmd_path = r'C:\run_with_env.cmd'
-
-
-# define our commands
-if host_platform == 'Windows':
-    script_dir_name = 'Scripts'
-    default_miniconda_dir = p.expanduser('C:\Miniconda')
-    temp_installer_path = 'C:\{}.exe'.format(uuid.uuid4())
-else:
-    script_dir_name = 'bin'
-    default_miniconda_dir = p.expanduser('~/miniconda')
-    temp_installer_path = p.expanduser('~/{}.sh'.format(uuid.uuid4()))
+URL_WIN_SCRIPT = 'https://raw.githubusercontent.com/jabooth/python-appveyor-conda-example/master/continuous-integration/appveyor/run_with_env.cmd'
+RUN_WITH_ENV_CMD_PATH = r'C:\run_with_env.cmd'
 
 
 # Amazingly, adding these causes conda-build to fail parsing yaml. :-|
@@ -109,6 +79,26 @@ def dirs_containing_file(fname, root=os.curdir):
             yield path
 
 
+def host_platform():
+    return stdplatform.system()
+
+
+def host_arch():
+    arch = stdplatform.architecture()[0]
+    # need to be a little more sneaky to check the platform on Windows:
+    # http://stackoverflow.com/questions/2208828/detect-64bit-os-windows-in-python
+    if host_platform() == 'Windows':
+        if 'APPVEYOR' in os.environ:
+            av_platform = os.environ['PLATFORM']
+            if av_platform == 'x86':
+                arch = '32bit'
+            elif av_platform == 'x64':
+                arch = '64bit'
+            else:
+                print('Was unable to interpret the platform "{}"'.format())
+    return arch
+
+
 # ------------------------ MINICONDA INTEGRATION ---------------------------- #
 
 def url_for_platform_version(platform, py_version, arch):
@@ -132,6 +122,28 @@ def url_for_platform_version(platform, py_version, arch):
                      arch_str[arch]]) + ext[platform]
 
 
+def temp_installer_path():
+    return ('C:\{}.exe'.format(uuid.uuid4()) if host_platform() == 'Windows'
+            else p.expanduser('~/{}.sh'.format(uuid.uuid4())))
+
+
+def default_miniconda_dir():
+    return (p.expanduser('C:\Miniconda') if host_platform() == 'Windows'
+            else p.expanduser('~/miniconda'))
+
+
+# the script directory inside a miniconda install varies based on platform
+def miniconda_script_dir_name():
+    return 'Scripts' if host_platform() == 'Windows' else 'bin'
+
+
+# handles to binaries from a miniconda install
+miniconda_script_dir = lambda mc: p.join(mc, miniconda_script_dir_name())
+conda = lambda mc: p.join(miniconda_script_dir(mc), 'conda')
+binstar = lambda mc: p.join(miniconda_script_dir(mc), 'binstar')
+python = lambda mc: p.join(miniconda_script_dir(mc), 'python')
+
+
 def acquire_miniconda(url, path_to_download):
     print('Downloading miniconda from {} to {}'.format(url, path_to_download))
     download_file(url, path_to_download)
@@ -139,7 +151,7 @@ def acquire_miniconda(url, path_to_download):
 
 def install_miniconda(path_to_installer, path_to_install):
     print('Installing miniconda to {}'.format(path_to_install))
-    if host_platform == 'Windows':
+    if host_platform() == 'Windows':
         execute([path_to_installer, '/S', '/D={}'.format(path_to_install)])
     else:
         execute(['chmod', '+x', path_to_installer])
@@ -147,13 +159,14 @@ def install_miniconda(path_to_installer, path_to_install):
 
 
 def setup_miniconda(python_version, installation_path, channel=None):
-    url = url_for_platform_version(host_platform, python_version, host_arch)
+    url = url_for_platform_version(host_platform(), python_version,
+                                   host_arch())
     print('Setting up miniconda from URL {}'.format(url))
     print("(Installing to '{}')".format(installation_path))
-    acquire_miniconda(url, temp_installer_path)
-    install_miniconda(temp_installer_path, installation_path)
+    acquire_miniconda(url, temp_installer_path())
+    install_miniconda(temp_installer_path(), installation_path)
     # delete the installer now we are done
-    os.unlink(temp_installer_path)
+    os.unlink(temp_installer_path())
     conda_cmd = conda(installation_path)
     cmds = [[conda_cmd, 'update', '-q', '--yes', 'conda'],
             [conda_cmd, 'install', '-q', '--yes', 'conda-build', 'jinja2',
@@ -167,13 +180,6 @@ def setup_miniconda(python_version, installation_path, channel=None):
     execute_sequence(*cmds)
 
 
-# handles to binaries from a miniconda install
-miniconda_script_dir = lambda mc: p.join(mc, script_dir_name)
-conda = lambda mc: p.join(miniconda_script_dir(mc), 'conda')
-binstar = lambda mc: p.join(miniconda_script_dir(mc), 'binstar')
-python = lambda mc: p.join(miniconda_script_dir(mc), 'python')
-
-
 # ------------------------ CONDA BUILD INTEGRATION -------------------------- #
 
 def get_conda_build_path(path):
@@ -182,17 +188,17 @@ def get_conda_build_path(path):
     return bldpkg_path(MetaData(path))
 
 
-def conda_build_package_win(mc, path):
+def _conda_build_package_win(mc, path):
     if 'BINSTAR_KEY' in os.environ:
         print('found BINSTAR_KEY in environment on Windows - deleting to '
               'stop vcvarsall from telling the world')
         del os.environ['BINSTAR_KEY']
-    os.environ['PYTHON_ARCH'] = host_arch[:2]
+    os.environ['PYTHON_ARCH'] = host_arch()[:2]
     os.environ['PYTHON_VERSION'] = '{}.{}'.format(sys.version_info.major,
                                                   sys.version_info.minor)
     print('PYTHON_ARCH={} PYTHON_VERSION={}'.format(os.environ['PYTHON_ARCH'],
                                                     os.environ['PYTHON_VERSION']))
-    execute(['cmd', '/E:ON', '/V:ON', '/C', run_with_env_cmd_path,
+    execute(['cmd', '/E:ON', '/V:ON', '/C', RUN_WITH_ENV_CMD_PATH,
              conda(mc), 'build', '-q', path])
 
 
@@ -211,8 +217,8 @@ def build_conda_package(mc, path, channel=None):
     else:
         print('building a RC or tag release - no master channel added.')
 
-    if host_platform == 'Windows':
-        conda_build_package_win(mc, path)
+    if host_platform() == 'Windows':
+        _conda_build_package_win(mc, path)
     else:
         execute([conda(mc), 'build', '-q', path])
 
@@ -301,10 +307,6 @@ def set_condaci_version():
 
 # -------------------------- BINSTAR INTEGRATION ---------------------------- #
 
-def login():
-    from binstar_client.utils import get_binstar
-    return get_binstar()
-
 
 class LetMeIn:
     def __init__(self, key):
@@ -312,7 +314,12 @@ class LetMeIn:
         self.site = False
 
 
-def login_with_key(key):
+def login_to_binstar():
+    from binstar_client.utils import get_binstar
+    return get_binstar()
+
+
+def login_to_binstar_with_key(key):
     from binstar_client.utils import get_binstar
     return get_binstar(args=LetMeIn(key))
 
@@ -362,33 +369,33 @@ class BinstarFile(object):
         return "\n".join(s)
 
 
-configuration_from_filename = lambda fn: fn.split('-')[-1].split('.')[0]
-name_from_filename = lambda fn: fn.split('-')[0]
-version_from_filename = lambda fn: fn.split('-')[1]
-platform_from_filepath = lambda fp: p.split(p.split(fp)[0])[-1]
+configuration_from_binstar_filename = lambda fn: fn.split('-')[-1].split('.')[0]
+name_from_binstar_filename = lambda fn: fn.split('-')[0]
+version_from_binstar_filename = lambda fn: fn.split('-')[1]
+platform_from_binstar_filepath = lambda fp: p.split(p.split(fp)[0])[-1]
 
 
-def channels_for_user(b, user):
+def binstar_channels_for_user(b, user):
     return b.list_channels(user).keys()
 
 
-def files_on_channel(b, user, channel):
+def binstar_files_on_channel(b, user, channel):
     info = b.show_channel(channel, user)
     return [BinstarFile(i['full_name']) for i in info['files']]
 
 
-def remove_file(b, bfile):
+def binstar_remove_file(b, bfile):
     b.remove_dist(bfile.user, bfile.name, bfile.version, bfile.basename)
 
 
 def files_to_remove(b, user, channel, filepath):
-    platform_ = platform_from_filepath(filepath)
+    platform_ = platform_from_binstar_filepath(filepath)
     filename = p.split(filepath)[-1]
-    name = name_from_filename(filename)
-    version = version_from_filename(filename)
-    configuration = configuration_from_filename(filename)
+    name = name_from_binstar_filename(filename)
+    version = version_from_binstar_filename(filename)
+    configuration = configuration_from_binstar_filename(filename)
     # find all the files on this channel
-    all_files = files_on_channel(b, user, channel)
+    all_files = binstar_files_on_channel(b, user, channel)
     # other versions of this exact setup that are not tagged versions should
     # be removed
     print('Removing old releases matching:'
@@ -405,12 +412,12 @@ def files_to_remove(b, user, channel, filepath):
             same_version_different_build(version, f.version)]
 
 
-def purge_old_files(b, user, channel, filepath):
+def purge_old_binstar_files(b, user, channel, filepath):
     to_remove = files_to_remove(b, user, channel, filepath)
     print("Found {} releases to remove".format(len(to_remove)))
     for old_file in to_remove:
         print("Removing '{}'".format(old_file))
-        remove_file(b, old_file)
+        binstar_remove_file(b, old_file)
 
 
 def binstar_upload_unchecked(mc, key, user, channel, path):
@@ -459,10 +466,10 @@ def binstar_upload_if_appropriate(mc, path, user, key, channel=None):
 def binstar_upload_and_purge(mc, key, user, channel, filepath):
     print('Uploading to {}/{}'.format(user, channel))
     binstar_upload_unchecked(mc, key, user, channel, filepath)
-    b = login_with_key(key)
+    b = login_to_binstar_with_key(key)
     if channel != 'main':
         print("Purging old releases from channel '{}'".format(channel))
-        purge_old_files(b, user, channel, filepath)
+        purge_old_binstar_files(b, user, channel, filepath)
     else:
         print("On main channel - no purging of releases will be done.")
 
@@ -516,8 +523,8 @@ def binstar_channel_from_ci():
 # -------------------- [EXPERIMENTAL] PYPI INTEGRATION ---------------------- #
 
 pypirc_path = p.join(p.expanduser('~'), '.pypirc')
-pypi_upload_allowed = (host_platform == 'Linux' and
-                       host_arch == '64bit' and
+pypi_upload_allowed = (host_platform() == 'Linux' and
+                       host_arch() == '64bit' and
                        sys.version_info.major == 2)
 
 pypi_template = """[distutils]
@@ -554,16 +561,16 @@ def resolve_mc(mc):
     if mc is not None:
         return mc
     else:
-        return default_miniconda_dir
+        return default_miniconda_dir()
 
 
 def setup_cmd(args):
     mc = resolve_mc(args.path)
     setup_miniconda(args.python, mc, channel=args.channel)
-    if host_platform == 'Windows':
+    if host_platform() == 'Windows':
         print('downloading magical Windows SDK configuration'
-              ' script to {}'.format(run_with_env_cmd_path))
-        download_file(url_win_script, run_with_env_cmd_path)
+              ' script to {}'.format(RUN_WITH_ENV_CMD_PATH))
+        download_file(URL_WIN_SCRIPT, RUN_WITH_ENV_CMD_PATH)
 
 
 def build_cmd(args):
@@ -603,7 +610,7 @@ def add_miniconda_parser(parser):
     parser.add_argument(
         "-m", "--miniconda",
         help="directory that miniconda is installed in (if not provided "
-             "taken as '{}')".format(default_miniconda_dir))
+             "taken as '{}')".format(default_miniconda_dir()))
 
 
 def add_pypi_parser(pa):
@@ -640,7 +647,7 @@ if __name__ == "__main__":
     sp.add_argument("python", choices=['2.7', '3.4'])
     sp.add_argument('-p', '--path', help='the path to install miniconda to. '
                                          'If not provided defaults to {'
-                                         '}'.format(default_miniconda_dir))
+                                         '}'.format(default_miniconda_dir()))
     sp.add_argument("-c", "--channel",
                     help="binstar channel to activate")
     sp.set_defaults(func=setup_cmd)
