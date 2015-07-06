@@ -487,7 +487,7 @@ def branch_from_travis():
         print('WARNING - on travis and TRAVIS_TAG == TRAVIS_BRANCH. This '
               'suggests that we are building a tag.')
         print('Travis obscures the branch in this scenario, so we assume that'
-              'the branch is "master"')
+              ' the branch is "master"')
         return 'master'
     else:
         return branch
