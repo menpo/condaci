@@ -209,12 +209,13 @@ def conda_build_package_win(mc, path):
 
 def build_conda_package(mc, path, channel=None):
     print('Building package at path {}'.format(path))
-    print('Attempting to set CONDACI_VERSION environment variable')
-    set_condaci_version()
+    v = get_version(path)
+    print('Detected version: {}'.format(v))
+    print('Setting CONDACI_VERSION environment variable to {}'.format(v))
+    os.environ['CONDACI_VERSION'] = v
 
-    # this is a little menpo-specific, but we want to add the master channel
-    # when doing dev builds to source our other dev dependencies
-    v = get_version()
+    # we want to add the master channel when doing dev builds to source our
+    # other dev dependencies
     if not (is_release_tag(v) or is_rc_tag(v)):
         print('building a non-release non-RC build - adding master channel.')
         if channel is None:
@@ -256,39 +257,32 @@ def versions_from_versioneer():
             sys.path.pop(0)
 
 
-def version_from_git_tags():
-    # if we can't use versioneer, we can manually fall back to look at git to
-    # build our own PEP440 version
-    raw = subprocess.check_output(['git', 'describe', '--tags']).strip()
-    if sys.version_info.major == 3:
-        # this always comes back as bytes. On Py3, convert to a string
-        raw = raw.decode("utf-8")
-    # git tags commonly start with a 'v' or 'V'
-    if raw[0].lower() == 'v':
-        raw = raw[1:]
-    try:
-        # raw of form 'VERSION-NCOMMITS-SHA - split it and rebuild in right way
-        v, n_commits, sha = raw.split('-')
-    except ValueError:
-        # this version string is not as expected.
-        print('warning - could not interpret version string from git - you '
-              'may have a non-PEP440 version string')
-        return raw
-    else:
-        return v + '+' + n_commits + '.' + sha
+def version_from_meta_yaml(path):
+    meta_yaml_path = os.path.join(path, 'meta.yaml')
+    with open(meta_yaml_path, 'rt') as f:
+        s = f.read()
+    v = s.split('version:', 1)[1].split('\n', 1)[0].strip().strip("'").strip('"')
+    if '{{' in v:
+        raise ValueError('Trying to establish version from meta.yaml'
+                         ' and it seems to be dynamic: {}'.format(v))
+    return v
 
 
-def get_version():
+def get_version(path):
     # search for versioneer versions in our subdirs
     versions = list(versions_from_versioneer())
 
     if len(versions) == 1:
         version = versions[0]
-        print('found single unambiguous versioneer version: {}'.format(version))
+        print('Found unambiguous versioneer version: {}'.format(version))
+    elif len(versions) > 1:
+        raise ValueError('Multiple versioneer _version.py files - cannot '
+                         'resolve unambiguous version. '
+                         'Versions found are: {}'.format(versions))
     else:
-        print('WARNING: found no or multiple versioneer _version.py files - '
-              'falling back to interrogate git manually for version')
-        version = version_from_git_tags()
+        # this project doesn't seem to be versioneer controlled - maybe the
+        # version is hardcoded? Interrogate meta.yaml
+        version = version_from_meta_yaml(path)
     return version
 
 # booleans about the state of the the PEP440 tags.
@@ -296,15 +290,6 @@ is_tag = lambda v: '+' not in v
 is_dev_tag = lambda v: v.split('.')[-1].startswith('dev')
 is_rc_tag = lambda v: 'rc' in v.split('+')[0]
 is_release_tag = lambda v: is_tag(v) and not (is_rc_tag(v) or is_dev_tag(v))
-
-
-def set_condaci_version():
-    # set the env variable CONDACI_VERSION to the current version (so it can
-    # be used in meta.yaml pre-build)
-    try:
-        os.environ['CONDACI_VERSION'] = get_version()
-    except subprocess.CalledProcessError:
-        print('Warning - unable to set CONDACI_VERSION')
 
 
 # -------------------------- BINSTAR INTEGRATION ---------------------------- #
@@ -450,7 +435,7 @@ def binstar_upload_if_appropriate(mc, path, user, key, channel=None):
         if channel is None:
             print('No upload channel provided - auto resolving channel based '
                   'on release type and CI status')
-            channel = binstar_channel_from_ci()
+            channel = binstar_channel_from_ci(path)
         print("Fit to upload to channel '{}'".format(channel))
         binstar_upload_and_purge(mc, key, user, channel,
                                  get_conda_build_path(path))
@@ -521,12 +506,12 @@ def resolve_can_upload_from_ci():
     return can_upload
 
 
-def binstar_channel_from_ci():
-    v = get_version()
+def binstar_channel_from_ci(path):
+    v = get_version(path)
     if is_release_tag(v):
         # tagged releases always go to main
         print("current head is a tagged release ({}), "
-              "uploading to 'main' channel".format(get_version()))
+              "uploading to 'main' channel".format(v))
         return 'main'
     else:
         print('current head is not a release - interrogating CI to decide on '
@@ -606,7 +591,7 @@ def pypi_cmd(args):
 
 
 def version_cmd(_):
-    print(get_version())
+    print(get_version(None))
 
 
 def auto_cmd(args):
