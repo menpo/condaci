@@ -478,7 +478,15 @@ is_pr_from_travis = lambda: os.environ['TRAVIS_PULL_REQUEST'] != 'false'
 is_pr_from_appveyor = lambda: 'APPVEYOR_PULL_REQUEST_NUMBER' in os.environ
 
 branch_from_appveyor = lambda: os.environ['APPVEYOR_REPO_BRANCH']
-branch_from_travis = lambda: os.environ['TRAVIS_BRANCH']
+
+
+def branch_from_travis():
+    t = os.environ['TRAVIS_TAG']
+    print('TRAVIS_TAG: {}'.format(t))
+    print('TRAVIS_TAG is None: {}'.format(t is None))
+    print('TRAVIS_TAG is "": {}'.format(t == ''))
+    print('TRAVIS_BRANCH: {}'.format(os.environ['TRAVIS_BRANCH']))
+    return os.environ['TRAVIS_BRANCH']
 
 
 def is_pr_on_ci():
