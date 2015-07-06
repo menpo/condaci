@@ -481,12 +481,16 @@ branch_from_appveyor = lambda: os.environ['APPVEYOR_REPO_BRANCH']
 
 
 def branch_from_travis():
-    t = os.environ['TRAVIS_TAG']
-    print('TRAVIS_TAG: {}'.format(t))
-    print('TRAVIS_TAG is None: {}'.format(t is None))
-    print('TRAVIS_TAG is "": {}'.format(t == ''))
-    print('TRAVIS_BRANCH: {}'.format(os.environ['TRAVIS_BRANCH']))
-    return os.environ['TRAVIS_BRANCH']
+    tag = os.environ['TRAVIS_TAG']
+    branch = os.environ['TRAVIS_BRANCH']
+    if tag == branch:
+        print('WARNING - on travis and TRAVIS_TAG == TRAVIS_BRANCH. This '
+              'suggests that we are building a tag.')
+        print('Travis obscures the branch in this scenario, so we assume that'
+              'the branch is "master"')
+        return 'master'
+    else:
+        return branch
 
 
 def is_pr_on_ci():
