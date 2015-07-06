@@ -8,16 +8,15 @@ import uuid
 import sys
 from pprint import pprint
 
-URL_WIN_SCRIPT = 'https://raw.githubusercontent.com/jabooth/python-appveyor-conda-example/master/continuous-integration/appveyor/run_with_env.cmd'
-RUN_WITH_ENV_CMD_PATH = r'C:\run_with_env.cmd'
+# on windows we have to download a small secondary script that configures
+# Python 3 64-bit extensions. Here we define the URL and the local path that
+# we will use for this script.
+MAGIC_WIN_SCRIPT_URL = 'https://raw.githubusercontent.com/jabooth/python-appveyor-conda-example/master/continuous-integration/appveyor/run_with_env.cmd'
+MAGIC_WIN_SCRIPT_PATH = r'C:\run_with_env.cmd'
 
-
-RANDOM_UUID = uuid.uuid4()  # used for temp file
-
-# Amazingly, adding these causes conda-build to fail parsing yaml. :-|
-#print('running on {} {}'.format(platform, arch))
-#print('miniconda_installer_path is {}'.format(miniconda_installer_path))
-#print('miniconda will be installed to {}'.format(miniconda_dir))
+# a random string we can use for the miniconda installer
+# (to avoid name collisions)
+RANDOM_UUID = uuid.uuid4()
 
 
 # ------------------------------ UTILITIES ---------------------------------- #
@@ -125,11 +124,15 @@ def url_for_platform_version(platform, py_version, arch):
 
 
 def temp_installer_path():
+    # we need a place to download the miniconda installer too. use a random
+    # string for the filename to avoid collisions, but choose the dir based
+    # on platform
     return ('C:\{}.exe'.format(RANDOM_UUID) if host_platform() == 'Windows'
             else p.expanduser('~/{}.sh'.format(RANDOM_UUID)))
 
 
 def default_miniconda_dir():
+    # the directory where miniconda will be installed too
     return (p.expanduser('C:\Miniconda') if host_platform() == 'Windows'
             else p.expanduser('~/miniconda'))
 
@@ -200,7 +203,7 @@ def conda_build_package_win(mc, path):
                                                   sys.version_info.minor)
     print('PYTHON_ARCH={} PYTHON_VERSION={}'.format(os.environ['PYTHON_ARCH'],
                                                     os.environ['PYTHON_VERSION']))
-    execute(['cmd', '/E:ON', '/V:ON', '/C', RUN_WITH_ENV_CMD_PATH,
+    execute(['cmd', '/E:ON', '/V:ON', '/C', MAGIC_WIN_SCRIPT_PATH,
              conda(mc), 'build', '-q', path])
 
 
@@ -211,8 +214,9 @@ def build_conda_package(mc, path, channel=None):
 
     # this is a little menpo-specific, but we want to add the master channel
     # when doing dev builds to source our other dev dependencies
-    if is_tag_that_needs_master_channel():
-        print('building a non-RC non-release-tag build - adding master channel.')
+    v = get_version()
+    if not (is_release_tag(v) or is_rc_tag(v)):
+        print('building a non-release non-RC build - adding master channel.')
         if channel is None:
             print('warning - no channel provided - cannot add master channel')
         else:
@@ -228,11 +232,15 @@ def build_conda_package(mc, path, channel=None):
 
 # ------------------------- VERSIONING INTEGRATION -------------------------- #
 
-version_is_tag = lambda v: '+' not in v
+# versions that match up to master changes (anything after a '+')
 same_version_different_build = lambda v1, v2: v2.startswith(v1.split('+')[0])
 
 
 def versions_from_versioneer():
+    # Ideally, we will interrogate versioneer to find out the version of the
+    # project we are building. Note that we can't simply look at
+    # project.__version__ as we need the version string pre-build, so the
+    # package may not be importable.
     for dir_ in dirs_containing_file('_version.py'):
         sys.path.insert(0, dir_)
 
@@ -249,6 +257,8 @@ def versions_from_versioneer():
 
 
 def version_from_git_tags():
+    # if we can't use versioneer, we can manually fall back to look at git to
+    # build our own PEP440 version
     raw = subprocess.check_output(['git', 'describe', '--tags']).strip()
     if sys.version_info.major == 3:
         # this always comes back as bytes. On Py3, convert to a string
@@ -276,42 +286,21 @@ def get_version():
         version = versions[0]
         print('found single unambiguous versioneer version: {}'.format(version))
     else:
-        print('found no versioneer _version.py files - falling back to manual version')
+        print('WARNING: found no or multiple versioneer _version.py files - '
+              'falling back to interrogate git manually for version')
         version = version_from_git_tags()
     return version
 
-
-def is_dev_tag():
-    v = get_version()
-    ending = v.split('.')[-1]
-    return ending.startswith('dev')
-
-
-# warning - this assumes up to 9 release candidates
-def is_rc_tag():
-    v = get_version()
-    return v.split('+')[0][:-1].endswith('rc')
-
-
-def is_release_tag():
-    v = get_version()
-    is_a_tag = '+' not in v
-    return is_a_tag and not is_rc_tag() and not is_dev_tag()
-
-
-def is_tag_that_needs_master_channel():
-    return not (is_release_tag() or is_rc_tag())
-
-
-def git_head_has_tag():
-    try:
-        execute(['git', 'describe', '--exact-match', '--tags', 'HEAD'])
-        return True
-    except subprocess.CalledProcessError:
-        return False
+# booleans about the state of the the PEP440 tags.
+is_tag = lambda v: '+' not in v
+is_dev_tag = lambda v: v.split('.')[-1].startswith('dev')
+is_rc_tag = lambda v: 'rc' in v.split('+')[0]
+is_release_tag = lambda v: is_tag(v) and not (is_rc_tag(v) or is_dev_tag(v))
 
 
 def set_condaci_version():
+    # set the env variable CONDACI_VERSION to the current version (so it can
+    # be used in meta.yaml pre-build)
     try:
         os.environ['CONDACI_VERSION'] = get_version()
     except subprocess.CalledProcessError:
@@ -414,14 +403,14 @@ def files_to_remove(b, user, channel, filepath):
     print('Removing old releases matching:'
           '\nname: {}\nconfiguration: {}\nplatform: {}'
           '\nversion: {}'.format(name, configuration, platform_, version))
-    print('candidate releases are:')
-    pprint([f.all_info() for f in all_files])
+    print('candidate releases with same name are:')
+    pprint([f.all_info() for f in all_files if f.name == name])
     return [f for f in all_files if
             f.name == name and
             f.configuration == configuration and
             f.platform == platform_ and
             f.version != version and
-            not version_is_tag(f.version) and
+            not is_release_tag(f.version) and
             same_version_different_build(version, f.version)]
 
 
@@ -430,7 +419,7 @@ def purge_old_binstar_files(b, user, channel, filepath):
     print("Found {} releases to remove".format(len(to_remove)))
     for old_file in to_remove:
         print("Removing '{}'".format(old_file))
-        # binstar_remove_file(b, old_file)
+        binstar_remove_file(b, old_file)
 
 
 def binstar_upload_unchecked(mc, key, user, channel, path):
@@ -455,19 +444,12 @@ def binstar_upload_if_appropriate(mc, path, user, key, channel=None):
         print('-> Unable to upload to binstar')
         return
     print('Have a user ({}) and key - can upload if suitable'.format(user))
-    # decide if we should attempt an upload
 
-    if is_dev_tag():
-        print('on a dev tag - will not upload to binstar')
-        return
-
-    if is_rc_tag():
-        print('on an rc tag - will not upload to binstar')
-        return
-
+    # decide if we should attempt an upload (if it's a PR we can't)
     if resolve_can_upload_from_ci():
         if channel is None:
-            print('resolving channel from CI/git tags')
+            print('No upload channel provided - auto resolving channel based '
+                  'on release type and CI status')
             channel = binstar_channel_from_ci()
         print("Fit to upload to channel '{}'".format(channel))
         binstar_upload_and_purge(mc, key, user, channel,
@@ -489,12 +471,14 @@ def binstar_upload_and_purge(mc, key, user, channel, filepath):
 
 # -------------- CONTINUOUS INTEGRATION-SPECIFIC FUNCTIONALITY -------------- #
 
-def is_on_appveyor():
-    return 'APPVEYOR' in os.environ
+is_on_appveyor = lambda: 'APPVEYOR' in os.environ
+is_on_travis = lambda: 'TRAVIS' in os.environ
 
+is_pr_from_travis = lambda: os.environ['TRAVIS_PULL_REQUEST'] != 'false'
+is_pr_from_appveyor = lambda: 'APPVEYOR_PULL_REQUEST_NUMBER' in os.environ
 
-def is_on_travis():
-    return 'TRAVIS' in os.environ
+branch_from_appveyor = lambda: os.environ['APPVEYOR_REPO_BRANCH']
+branch_from_travis = lambda: os.environ['TRAVIS_BRANCH']
 
 
 def is_pr_on_ci():
@@ -505,19 +489,6 @@ def is_pr_on_ci():
     else:
         raise ValueError("Not on appveyor or travis so can't "
                          "resolve whether we are on a PR or not")
-
-
-def resolve_can_upload_from_ci():
-    # can upload as long as this isn't a PR
-    can_upload = not is_pr_on_ci()
-    print("Can we can upload? : {}".format(can_upload))
-    return can_upload
-
-is_pr_from_travis = lambda: os.environ['TRAVIS_PULL_REQUEST'] != 'false'
-is_pr_from_appveyor = lambda: 'APPVEYOR_PULL_REQUEST_NUMBER' in os.environ
-
-branch_from_appveyor = lambda: os.environ['APPVEYOR_REPO_BRANCH']
-branch_from_travis = lambda: os.environ['TRAVIS_BRANCH']
 
 
 def branch_from_ci():
@@ -531,13 +502,23 @@ def branch_from_ci():
                          "decide on branch")
 
 
+def resolve_can_upload_from_ci():
+    # can upload as long as this isn't a PR
+    can_upload = not is_pr_on_ci()
+    print("Can we can upload? : {}".format(can_upload))
+    return can_upload
+
+
 def binstar_channel_from_ci():
-    if is_release_tag():
+    v = get_version()
+    if is_release_tag(v):
         # tagged releases always go to main
         print("current head is a tagged release ({}), "
               "uploading to 'main' channel".format(get_version()))
         return 'main'
     else:
+        print('current head is not a release - interrogating CI to decide on '
+              'channel to upload to (based on branch)')
         return branch_from_ci()
 
 
@@ -565,7 +546,8 @@ def upload_to_pypi_if_appropriate(mc, username, password):
     if username is None or password is None:
         print('Missing PyPI username or password, skipping upload')
         return
-    if not git_head_has_tag():
+    v = get_version()
+    if not is_release_tag(v):
         print('Not on a tagged release - not uploading to PyPI')
         return
     if not pypi_upload_allowed:
@@ -590,8 +572,8 @@ def setup_cmd(args):
     setup_miniconda(args.python, mc, channel=args.channel)
     if host_platform() == 'Windows':
         print('downloading magical Windows SDK configuration'
-              ' script to {}'.format(RUN_WITH_ENV_CMD_PATH))
-        download_file(URL_WIN_SCRIPT, RUN_WITH_ENV_CMD_PATH)
+              ' script to {}'.format(MAGIC_WIN_SCRIPT_PATH))
+        download_file(MAGIC_WIN_SCRIPT_URL, MAGIC_WIN_SCRIPT_PATH)
 
 
 def build_cmd(args):
