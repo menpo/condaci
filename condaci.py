@@ -39,7 +39,7 @@ def set_globals_from_environ():
 
     if PYTHON_VERSION is None:
         raise ValueError('Fatal: PYTHON_VERSION is not set.')
-    if PYTHON_VERSION not in ['2.7, 3.4']:
+    if PYTHON_VERSION not in ['2.7', '3.4']:
         raise ValueError("Fatal: PYTHON_VERSION '{}' is invalid - must be "
                          "either '2.7' or '3.4'".format(PYTHON_VERSION))
 
