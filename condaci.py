@@ -599,10 +599,10 @@ def binstar_channel_from_ci(path):
 
 # --------------------------- ARGPARSE COMMANDS ----------------------------- #
 
-def auto_cmd(args):
+def condaci(args):
     set_globals_from_environ()
     mc = miniconda_dir()
-    conda_meta = args.buildpath
+    conda_meta = args.meta_yaml_dir
     setup_miniconda(PYTHON_VERSION, mc, binstar_user=BINSTAR_USER)
 
     if host_platform() == 'Windows':
@@ -616,22 +616,13 @@ def auto_cmd(args):
     #upload_to_pypi_if_appropriate(mc, args.pypiuser, args.pypipassword)
 
 
-def add_buildpath_parser(pa):
-    pa.add_argument('buildpath',
-                    help="path to the conda build scripts")
-
-
 if __name__ == "__main__":
     from argparse import ArgumentParser
     pa = ArgumentParser(
         description=r"""
         Sets up miniconda, builds, and uploads to Binstar.
         """)
-    subp = pa.add_subparsers()
-
-    auto = subp.add_parser('auto', help='build and upload to binstar and pypi')
-    add_buildpath_parser(auto)
-    auto.set_defaults(func=auto_cmd)
-
-    args = pa.parse_args()
-    args.func(args)
+    pa.add_argument('meta_yaml_dir',
+                    help="path to the dir containing the conda meta.yaml"
+                         "build script")
+    condaci(pa.parse_args())
