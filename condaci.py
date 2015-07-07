@@ -508,7 +508,21 @@ is_pr_from_appveyor = lambda: 'APPVEYOR_PULL_REQUEST_NUMBER' in os.environ
 is_pr_from_jenkins = lambda: 'ghprbSourceBranch' in os.environ
 
 branch_from_appveyor = lambda: os.environ['APPVEYOR_REPO_BRANCH']
-branch_from_jenkins = lambda: os.environ['GIT_BRANCH']
+
+
+def branch_from_jenkins():
+    branch = os.environ['GIT_BRANCH']
+    if branch.startswith('origin/tags'):
+        print('WARNING - on jenkins and GIT_BRANCH starts with origin/tags. '
+              'This suggests that we are building a tag.')
+        print('Jenkins obscures the branch in this scenario, so we assume that'
+              ' the branch is "master"')
+        return 'master'
+    elif '/' in branch:
+        raise ValueError('Error: jenkins branch name seems '
+                         'suspicious: {}'.format(branch))
+    else:
+        return branch
 
 
 def branch_from_travis():
