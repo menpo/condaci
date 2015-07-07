@@ -18,6 +18,31 @@ MAGIC_WIN_SCRIPT_PATH = r'C:\run_with_env.cmd'
 # (to avoid name collisions)
 RANDOM_UUID = uuid.uuid4()
 
+# -------------------------------- STATE ------------------------------------ #
+
+# Key globals that need to be set for the rest of the script.
+PYTHON_VERSION = None
+BINSTAR_USER = None
+BINSTAR_KEY = None
+
+def set_globals_from_environ():
+    global PYTHON_VERSION, BINSTAR_KEY, BINSTAR_USER
+
+    PYTHON_VERSION = os.environ.get('PYTHON_VERSION')
+    BINSTAR_USER = os.environ.get('BINSTAR_USER')
+    BINSTAR_KEY = os.environ.get('BINSTAR_KEY')
+
+    print('Environment variables extracted:')
+    print('PYTHON_VERSION: {}'.format(PYTHON_VERSION))
+    print('BINSTAR_USER: {}'.format(BINSTAR_USER))
+    print('BINSTAR_KEY: {}'.format('*****' if BINSTAR_KEY is not None else '-'))
+
+    if PYTHON_VERSION is None:
+        raise ValueError('Fatal: PYTHON_VERSION is not set.')
+    if PYTHON_VERSION not in ['2.7, 3.4']:
+        raise ValueError("Fatal: PYTHON_VERSION '{}' is invalid - must be "
+                         "either '2.7' or '3.4'".format(PYTHON_VERSION))
+
 
 # ------------------------------ UTILITIES ---------------------------------- #
 
@@ -131,10 +156,21 @@ def temp_installer_path():
             else p.expanduser('~/{}.sh'.format(RANDOM_UUID)))
 
 
-def default_miniconda_dir():
+def miniconda_dir():
     # the directory where miniconda will be installed too
-    return (p.expanduser('C:\Miniconda') if host_platform() == 'Windows'
+    path = (p.expanduser('C:\Miniconda') if host_platform() == 'Windows'
             else p.expanduser('~/miniconda'))
+    if is_on_jenkins():
+        # jenkins persists miniconda installs between builds, but we want a
+        # unique miniconda env for each executor
+        if not os.path.isdir(path):
+                os.mkdir(path)
+        exec_no = os.environ['EXECUTOR_NUMBER']
+        j_path = os.path.join(path, exec_no)
+        if not os.path.isdir(j_path):
+            os.mkdir(j_path)
+        path = os.path.join(j_path, PYTHON_VERSION)
+    return path
 
 
 # the script directory inside a miniconda install varies based on platform
@@ -146,7 +182,6 @@ def miniconda_script_dir_name():
 miniconda_script_dir = lambda mc: p.join(mc, miniconda_script_dir_name())
 conda = lambda mc: p.join(miniconda_script_dir(mc), 'conda')
 binstar = lambda mc: p.join(miniconda_script_dir(mc), 'binstar')
-python = lambda mc: p.join(miniconda_script_dir(mc), 'python')
 
 
 def acquire_miniconda(url, path_to_download):
@@ -163,24 +198,32 @@ def install_miniconda(path_to_installer, path_to_install):
         execute([path_to_installer, '-b', '-p', path_to_install])
 
 
-def setup_miniconda(python_version, installation_path, channel=None):
-    url = url_for_platform_version(host_platform(), python_version,
-                                   host_arch())
-    print('Setting up miniconda from URL {}'.format(url))
-    print("(Installing to '{}')".format(installation_path))
-    acquire_miniconda(url, temp_installer_path())
-    install_miniconda(temp_installer_path(), installation_path)
-    # delete the installer now we are done
-    os.unlink(temp_installer_path())
+def setup_miniconda(python_version, installation_path, binstar_user=None):
     conda_cmd = conda(installation_path)
+    if os.path.exists(conda_cmd):
+        print('conda is already setup at {}'.format(installation_path))
+    else:
+        print('No existing conda install detected at {}'.format(installation_path))
+        url = url_for_platform_version(host_platform(), python_version,
+                                       host_arch())
+        print('Setting up miniconda from URL {}'.format(url))
+        print("(Installing to '{}')".format(installation_path))
+        acquire_miniconda(url, temp_installer_path())
+        install_miniconda(temp_installer_path(), installation_path)
+        # delete the installer now we are done
+        os.unlink(temp_installer_path())
     cmds = [[conda_cmd, 'update', '-q', '--yes', 'conda'],
             [conda_cmd, 'install', '-q', '--yes', 'conda-build', 'jinja2',
              'binstar']]
-    if channel is not None:
-        print("(adding channel '{}' for dependencies)".format(channel))
-        cmds.append([conda_cmd, 'config', '--add', 'channels', channel])
+    root_config = os.path.join(installation_path, '.condarc')
+    if os.path.exists(root_config):
+        print('existing root config at present at {} - removing'.format(root_config))
+        os.unlink(root_config)
+    if binstar_user is not None:
+        print("(adding user channel '{}' for dependencies to root config)".format(binstar_user))
+        cmds.append([conda_cmd, 'config', '--system', '--add', 'channels', binstar_user])
     else:
-        print("No channels have been configured (all dependencies have to be "
+        print("No user channels have been configured (all dependencies have to be "
               "sourced from anaconda)")
     execute_sequence(*cmds)
 
@@ -207,7 +250,7 @@ def conda_build_package_win(mc, path):
              conda(mc), 'build', '-q', path])
 
 
-def build_conda_package(mc, path, channel=None):
+def build_conda_package(mc, path, binstar_user=None):
     print('Building package at path {}'.format(path))
     v = get_version(path)
     print('Detected version: {}'.format(v))
@@ -218,10 +261,10 @@ def build_conda_package(mc, path, channel=None):
     # other dev dependencies
     if not (is_release_tag(v) or is_rc_tag(v)):
         print('building a non-release non-RC build - adding master channel.')
-        if channel is None:
-            print('warning - no channel provided - cannot add master channel')
+        if binstar_user is None:
+            print('warning - no binstar user provided - cannot add master channel')
         else:
-            execute([conda(mc), 'config', '--add', 'channels', channel + '/channel/master'])
+            execute([conda(mc), 'config', '--add', 'channels', binstar_user + '/channel/master'])
     else:
         print('building a RC or tag release - no master channel added.')
 
@@ -420,7 +463,7 @@ def binstar_upload_unchecked(mc, key, user, channel, path):
         raise subprocess.CalledProcessError(e.returncode, cmd)
 
 
-def binstar_upload_if_appropriate(mc, path, user, key, channel=None):
+def binstar_upload_if_appropriate(mc, path, user, key):
     if key is None:
         print('No binstar key provided')
     if user is None:
@@ -432,10 +475,8 @@ def binstar_upload_if_appropriate(mc, path, user, key, channel=None):
 
     # decide if we should attempt an upload (if it's a PR we can't)
     if resolve_can_upload_from_ci():
-        if channel is None:
-            print('No upload channel provided - auto resolving channel based '
-                  'on release type and CI status')
-            channel = binstar_channel_from_ci(path)
+        print('Auto resolving channel based on release type and CI status')
+        channel = binstar_channel_from_ci(path)
         print("Fit to upload to channel '{}'".format(channel))
         binstar_upload_and_purge(mc, key, user, channel,
                                  get_conda_build_path(path))
@@ -458,6 +499,7 @@ def binstar_upload_and_purge(mc, key, user, channel, filepath):
 
 is_on_appveyor = lambda: 'APPVEYOR' in os.environ
 is_on_travis = lambda: 'TRAVIS' in os.environ
+is_on_jenkins = lambda: 'JENKINS_URL' in os.environ
 
 is_pr_from_travis = lambda: os.environ['TRAVIS_PULL_REQUEST'] != 'false'
 is_pr_from_appveyor = lambda: 'APPVEYOR_PULL_REQUEST_NUMBER' in os.environ
@@ -521,101 +563,57 @@ def binstar_channel_from_ci(path):
 
 # -------------------- [EXPERIMENTAL] PYPI INTEGRATION ---------------------- #
 
-pypirc_path = p.join(p.expanduser('~'), '.pypirc')
-pypi_upload_allowed = (host_platform() == 'Linux' and
-                       host_arch() == '64bit' and
-                       sys.version_info.major == 2)
-
-pypi_template = """[distutils]
-index-servers = pypi
-
-[pypi]
-username:{}
-password:{}"""
-
-
-def pypi_setup_dotfile(username, password):
-    with open(pypirc_path, 'wb') as f:
-        f.write(pypi_template.format(username, password))
-
-
-def upload_to_pypi_if_appropriate(mc, username, password):
-    if username is None or password is None:
-        print('Missing PyPI username or password, skipping upload')
-        return
-    v = get_version()
-    if not is_release_tag(v):
-        print('Not on a tagged release - not uploading to PyPI')
-        return
-    if not pypi_upload_allowed:
-        print('Not on key node (Linux 64 Py2) - no PyPI upload')
-    print('Setting up .pypirc file..')
-    pypi_setup_dotfile(username, password)
-    print("Uploading to PyPI user '{}'".format(username))
-    execute_sequence([python(mc), 'setup.py', 'sdist', 'upload'])
+# pypirc_path = p.join(p.expanduser('~'), '.pypirc')
+# pypi_upload_allowed = (host_platform() == 'Linux' and
+#                        host_arch() == '64bit' and
+#                        sys.version_info.major == 2)
+#
+# pypi_template = """[distutils]
+# index-servers = pypi
+#
+# [pypi]
+# username:{}
+# password:{}"""
+#
+#
+# def pypi_setup_dotfile(username, password):
+#     with open(pypirc_path, 'wb') as f:
+#         f.write(pypi_template.format(username, password))
+#
+#
+# def upload_to_pypi_if_appropriate(mc, username, password):
+#     if username is None or password is None:
+#         print('Missing PyPI username or password, skipping upload')
+#         return
+#     v = get_version()
+#     if not is_release_tag(v):
+#         print('Not on a tagged release - not uploading to PyPI')
+#         return
+#     if not pypi_upload_allowed:
+#         print('Not on key node (Linux 64 Py2) - no PyPI upload')
+#     print('Setting up .pypirc file..')
+#     pypi_setup_dotfile(username, password)
+#     print("Uploading to PyPI user '{}'".format(username))
+#     execute_sequence([python(mc), 'setup.py', 'sdist', 'upload'])
 
 
 # --------------------------- ARGPARSE COMMANDS ----------------------------- #
 
-def resolve_mc(mc):
-    if mc is not None:
-        return mc
-    else:
-        return default_miniconda_dir()
+def auto_cmd(args):
+    mc = miniconda_dir()
+    conda_meta = args.buildpath
+    set_globals_from_environ()
+    setup_miniconda(PYTHON_VERSION, mc, binstar_user=BINSTAR_USER)
 
-
-def setup_cmd(args):
-    mc = resolve_mc(args.path)
-    setup_miniconda(args.python, mc, channel=args.channel)
     if host_platform() == 'Windows':
         print('downloading magical Windows SDK configuration'
               ' script to {}'.format(MAGIC_WIN_SCRIPT_PATH))
         download_file(MAGIC_WIN_SCRIPT_URL, MAGIC_WIN_SCRIPT_PATH)
 
-
-def build_cmd(args):
-    mc = resolve_mc(args.miniconda)
-    build_conda_package(mc, args.buildpath)
-
-
-def binstar_cmd(args):
-    mc = resolve_mc(args.miniconda)
-    print('binstar being called with args: {}'.format(args))
-    binstar_upload_if_appropriate(mc, args.buildpath, args.binstaruser,
-                                  args.binstarkey, channel=args.binstarchannel)
-
-
-def pypi_cmd(args):
-    mc = resolve_mc(args.miniconda)
-    upload_to_pypi_if_appropriate(mc, args.pypiuser, args.pypipassword)
-
-
-def version_cmd(_):
-    print(get_version(None))
-
-
-def auto_cmd(args):
-    mc = resolve_mc(args.miniconda)
-    build_conda_package(mc, args.buildpath, channel=args.binstaruser)
+    build_conda_package(mc, conda_meta, binstar_user=args.binstaruser)
     print('successfully built conda package, proceeding to upload')
-    binstar_upload_if_appropriate(mc, args.buildpath, args.binstaruser,
-                                  args.binstarkey,
-                                  channel=args.binstarchannel)
+    binstar_upload_if_appropriate(mc, conda_meta, BINSTAR_USER, BINSTAR_KEY)
     #upload_to_pypi_if_appropriate(mc, args.pypiuser, args.pypipassword)
-
-
-def add_miniconda_parser(parser):
-    parser.add_argument(
-        "-m", "--miniconda",
-        help="directory that miniconda is installed in (if not provided "
-             "taken as '{}')".format(default_miniconda_dir()))
-
-
-def add_pypi_parser(pa):
-    pa.add_argument('--pypiuser',  nargs='?', default=None,
-                    help='PyPI user to upload to')
-    pa.add_argument('--pypipassword', nargs='?', default=None,
-                    help='password of PyPI user')
 
 
 def add_buildpath_parser(pa):
@@ -623,59 +621,17 @@ def add_buildpath_parser(pa):
                     help="path to the conda build scripts")
 
 
-def add_binstar_parser(pa):
-    pa.add_argument('--binstaruser', nargs='?', default=None,
-                    help='Binstar user (or organisation) to upload to')
-    pa.add_argument('--binstarchannel', nargs='?', default=None,
-                    help='Binstar channel to uplaod to. If not provided will'
-                         ' be calculated based on the environment')
-    pa.add_argument('--binstarkey', nargs='?', default=None,
-                    help='Binstar API key to use for uploading')
-
-
 if __name__ == "__main__":
     from argparse import ArgumentParser
     pa = ArgumentParser(
         description=r"""
-        Sets up miniconda, builds, and uploads to Binstar and PyPI.
+        Sets up miniconda, builds, and uploads to Binstar.
         """)
     subp = pa.add_subparsers()
 
-    sp = subp.add_parser('setup', help='setup a miniconda environment')
-    sp.add_argument("python", choices=['2.7', '3.4'])
-    sp.add_argument('-p', '--path', help='the path to install miniconda to. '
-                                         'If not provided defaults to {'
-                                         '}'.format(default_miniconda_dir()))
-    sp.add_argument("-c", "--channel",
-                    help="binstar channel to activate")
-    sp.set_defaults(func=setup_cmd)
-
-    bp = subp.add_parser('build', help='run a conda build')
-    add_buildpath_parser(bp)
-    add_miniconda_parser(bp)
-    bp.set_defaults(func=build_cmd)
-
-    bin = subp.add_parser('binstar', help='upload a conda build to binstar')
-    add_buildpath_parser(bin)
-    add_binstar_parser(bin)
-    add_miniconda_parser(bin)
-    bin.set_defaults(func=binstar_cmd)
-
-    pypi = subp.add_parser('pypi', help='upload a source distribution to PyPI')
-    add_pypi_parser(pypi)
-    add_miniconda_parser(pypi)
-    pypi.set_defaults(func=pypi_cmd)
-
     auto = subp.add_parser('auto', help='build and upload to binstar and pypi')
     add_buildpath_parser(auto)
-    add_binstar_parser(auto)
-    add_miniconda_parser(auto)
-    add_pypi_parser(auto)
     auto.set_defaults(func=auto_cmd)
-
-    vp = subp.add_parser('version', help='print the version as reported by '
-                                         'versioneer or git')
-    vp.set_defaults(func=version_cmd)
 
     args = pa.parse_args()
     args.func(args)
