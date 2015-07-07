@@ -264,7 +264,8 @@ def build_conda_package(mc, path, binstar_user=None):
         if binstar_user is None:
             print('warning - no binstar user provided - cannot add master channel')
         else:
-            execute([conda(mc), 'config', '--add', 'channels', binstar_user + '/channel/master'])
+            execute([conda(mc), 'config', '--system', '--add', 'channels',
+                     binstar_user + '/channel/master'])
     else:
         print('building a RC or tag release - no master channel added.')
 
