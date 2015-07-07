@@ -25,6 +25,7 @@ PYTHON_VERSION = None
 BINSTAR_USER = None
 BINSTAR_KEY = None
 
+
 def set_globals_from_environ():
     global PYTHON_VERSION, BINSTAR_KEY, BINSTAR_USER
 
@@ -504,8 +505,10 @@ is_on_jenkins = lambda: 'JENKINS_URL' in os.environ
 
 is_pr_from_travis = lambda: os.environ['TRAVIS_PULL_REQUEST'] != 'false'
 is_pr_from_appveyor = lambda: 'APPVEYOR_PULL_REQUEST_NUMBER' in os.environ
+is_pr_from_jenkins = lambda: 'ghprbSourceBranch' in os.environ
 
 branch_from_appveyor = lambda: os.environ['APPVEYOR_REPO_BRANCH']
+branch_from_jenkins = lambda: os.environ['GIT_BRANCH']
 
 
 def branch_from_travis():
@@ -526,8 +529,10 @@ def is_pr_on_ci():
         return is_pr_from_travis()
     elif is_on_appveyor():
         return is_pr_from_appveyor()
+    elif is_on_jenkins():
+        return is_pr_from_jenkins()
     else:
-        raise ValueError("Not on appveyor or travis so can't "
+        raise ValueError("Not on appveyor, travis or jenkins, so can't "
                          "resolve whether we are on a PR or not")
 
 
@@ -536,8 +541,10 @@ def branch_from_ci():
         return branch_from_travis()
     elif is_on_appveyor():
         return branch_from_appveyor()
+    elif is_on_jenkins():
+        return branch_from_jenkins()
     else:
-        raise ValueError("We aren't on "
+        raise ValueError("We aren't on jenkins, "
                          "Appveyor or Travis so can't "
                          "decide on branch")
 
@@ -545,7 +552,7 @@ def branch_from_ci():
 def resolve_can_upload_from_ci():
     # can upload as long as this isn't a PR
     can_upload = not is_pr_on_ci()
-    print("Can we can upload? : {}".format(can_upload))
+    print("Can we can upload (i.e. is this not a PR)? : {}".format(can_upload))
     return can_upload
 
 
