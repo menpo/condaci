@@ -34,8 +34,8 @@ def set_globals_from_environ():
 
     print('Environment variables extracted:')
     print('PYTHON_VERSION: {}'.format(PYTHON_VERSION))
-    print('BINSTAR_USER: {}'.format(BINSTAR_USER))
-    print('BINSTAR_KEY: {}'.format('*****' if BINSTAR_KEY is not None else '-'))
+    print('  BINSTAR_USER: {}'.format(BINSTAR_USER))
+    print('   BINSTAR_KEY: {}'.format('*****' if BINSTAR_KEY is not None else '-'))
 
     if PYTHON_VERSION is None:
         raise ValueError('Fatal: PYTHON_VERSION is not set.')
