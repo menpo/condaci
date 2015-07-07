@@ -610,7 +610,7 @@ def auto_cmd(args):
               ' script to {}'.format(MAGIC_WIN_SCRIPT_PATH))
         download_file(MAGIC_WIN_SCRIPT_URL, MAGIC_WIN_SCRIPT_PATH)
 
-    build_conda_package(mc, conda_meta, binstar_user=args.binstaruser)
+    build_conda_package(mc, conda_meta, binstar_user=BINSTAR_USER)
     print('successfully built conda package, proceeding to upload')
     binstar_upload_if_appropriate(mc, conda_meta, BINSTAR_USER, BINSTAR_KEY)
     #upload_to_pypi_if_appropriate(mc, args.pypiuser, args.pypipassword)
