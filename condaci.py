@@ -600,9 +600,9 @@ def binstar_channel_from_ci(path):
 # --------------------------- ARGPARSE COMMANDS ----------------------------- #
 
 def auto_cmd(args):
+    set_globals_from_environ()
     mc = miniconda_dir()
     conda_meta = args.buildpath
-    set_globals_from_environ()
     setup_miniconda(PYTHON_VERSION, mc, binstar_user=BINSTAR_USER)
 
     if host_platform() == 'Windows':
