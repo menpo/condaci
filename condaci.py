@@ -621,11 +621,16 @@ def binstar_channel_from_ci(path):
 
 # --------------------------- ARGPARSE COMMANDS ----------------------------- #
 
-def condaci(args):
+def setup_cmd(args):
+    set_globals_from_environ()
+    mc = miniconda_dir()
+    setup_miniconda(PYTHON_VERSION, mc, binstar_user=BINSTAR_USER)
+
+
+def build_cmd(args):
     set_globals_from_environ()
     mc = miniconda_dir()
     conda_meta = args.meta_yaml_dir
-    setup_miniconda(PYTHON_VERSION, mc, binstar_user=BINSTAR_USER)
 
     if host_platform() == 'Windows':
         print('downloading magical Windows SDK configuration'
@@ -644,7 +649,15 @@ if __name__ == "__main__":
         description=r"""
         Sets up miniconda, builds, and uploads to Binstar.
         """)
-    pa.add_argument('meta_yaml_dir',
+    subp = pa.add_subparsers()
+
+    sp = subp.add_parser('setup', help='setup a miniconda environment')
+    sp.set_defaults(func=setup_cmd)
+
+    bp = subp.add_parser('build', help='run a conda build')
+    bp.add_argument('meta_yaml_dir',
                     help="path to the dir containing the conda meta.yaml"
                          "build script")
-    condaci(pa.parse_args())
+    bp.set_defaults(func=build_cmd)
+    args = pa.parse_args()
+    args.func(args)
