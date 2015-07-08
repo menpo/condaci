@@ -512,17 +512,18 @@ branch_from_appveyor = lambda: os.environ['APPVEYOR_REPO_BRANCH']
 
 def branch_from_jenkins():
     branch = os.environ['GIT_BRANCH']
-    if branch.startswith('origin/tags'):
-        print('WARNING - on jenkins and GIT_BRANCH starts with origin/tags. '
+    print('Jenkins has set GIT_BRANCH={}'.format(branch))
+    if branch.startswith('origin/tags/'):
+        print('WARNING - on jenkins and GIT_BRANCH starts with origin/tags/. '
               'This suggests that we are building a tag.')
         print('Jenkins obscures the branch in this scenario, so we assume that'
               ' the branch is "master"')
         return 'master'
-    elif '/' in branch:
+    elif branch.startswith('origin/'):
+        return branch.split('origin/', 1)[-1]
+    else:
         raise ValueError('Error: jenkins branch name seems '
                          'suspicious: {}'.format(branch))
-    else:
-        return branch
 
 
 def branch_from_travis():
