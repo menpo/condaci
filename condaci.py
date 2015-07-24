@@ -456,6 +456,7 @@ def purge_old_binstar_files(b, user, channel, filepath):
 
 
 def binstar_upload_unchecked(mc, key, user, channel, path):
+    print('Uploading from {} using {}'.format(path, binstar(mc)))
     try:
         # TODO - could this safely be co? then we would get the binstar error..
         check([binstar(mc), '-t', key, 'upload',
