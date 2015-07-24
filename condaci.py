@@ -185,7 +185,7 @@ def miniconda_script_dir_name():
 # handles to binaries from a miniconda install
 miniconda_script_dir = lambda mc: p.join(mc, miniconda_script_dir_name())
 conda = lambda mc: p.join(miniconda_script_dir(mc), 'conda')
-binstar = lambda mc: p.join(miniconda_script_dir(mc), 'binstar')
+binstar = lambda mc: p.join(miniconda_script_dir(mc), 'conda-server')
 
 
 def acquire_miniconda(url, path_to_download):
@@ -218,7 +218,7 @@ def setup_miniconda(python_version, installation_path, binstar_user=None):
         os.unlink(temp_installer_path())
     cmds = [[conda_cmd, 'update', '-q', '--yes', 'conda'],
             [conda_cmd, 'install', '-q', '--yes', 'conda-build', 'jinja2',
-             'binstar']]
+             'conda-server']]
     root_config = os.path.join(installation_path, '.condarc')
     if os.path.exists(root_config):
         print('existing root config at present at {} - removing'.format(root_config))
