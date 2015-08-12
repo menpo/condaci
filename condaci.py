@@ -14,9 +14,9 @@ from pprint import pprint
 # we will use for this script.
 import zipfile
 
-MAGIC_WIN_SCRIPT_URL = 'https://raw.githubusercontent.com/menpo/condaci/master/run_with_env.cmd'
+MAGIC_WIN_SCRIPT_URL = 'https://raw.githubusercontent.com/menpo/condaci/appveyor_vs2008/run_with_env.cmd'
 MAGIC_WIN_SCRIPT_PATH = r'C:\run_with_env.cmd'
-VS2008_PATCH_URL = 'https://raw.githubusercontent.com/menpo/condaci/master/vs2008_patch.zip'
+VS2008_PATCH_URL = 'https://raw.githubusercontent.com/menpo/condaci/appveyor_vs2008/vs2008_patch.zip'
 VS2008_PATCH_PATH = r'C:\vs2008_patch.zip'
 VS2008_PATCH_FOLDER_PATH = r'C:\vs2008_patch'
 
