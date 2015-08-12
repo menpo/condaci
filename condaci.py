@@ -287,7 +287,9 @@ def windows_setup_compiler():
             shutil.copyfile(os.path.join(VS2008_BIN_PATH, 'vcvars64.bat'),
                             os.path.join(VS2008_AMD64_PATH, 'vcvarsamd64.bat'))
         elif arch == '32bit':
-            execute([os.path.join(VS2008_PATCH_FOLDER_PATH, 'setup_x86.bat')])
+            # For some reason these files seems to be missing on Appveyor
+            # execute([os.path.join(VS2008_PATCH_FOLDER_PATH, 'setup_x86.bat')])
+            pass
         else:
             raise ValueError('Unexpected architecture {}'.format(arch))
 
