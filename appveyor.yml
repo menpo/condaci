@@ -10,4 +10,5 @@ platform:
 - x64
 
 install:
-- python condaci.py setup %PYTHON_VERSION%
+- python condaci.py setup
+
