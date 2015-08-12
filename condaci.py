@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import subprocess
 import os
+import shutil
 import os.path as p
 from functools import partial
 import platform as stdplatform
@@ -11,8 +12,16 @@ from pprint import pprint
 # on windows we have to download a small secondary script that configures
 # Python 3 64-bit extensions. Here we define the URL and the local path that
 # we will use for this script.
-MAGIC_WIN_SCRIPT_URL = 'https://raw.githubusercontent.com/jabooth/python-appveyor-conda-example/master/continuous-integration/appveyor/run_with_env.cmd'
+import zipfile
+
+MAGIC_WIN_SCRIPT_URL = 'https://raw.githubusercontent.com/menpo/condaci/master/run_with_env.cmd'
 MAGIC_WIN_SCRIPT_PATH = r'C:\run_with_env.cmd'
+VS2008_PATCH_URL = 'https://raw.githubusercontent.com/menpo/condaci/master/vs2008_patch.zip'
+VS2008_PATCH_PATH = r'C:\vs2008_patch.zip'
+VS2008_PATCH_FOLDER_PATH = r'C:\vs2008_patch'
+
+VS2008_PATH = r'C:\Program Files (x86)\Microsoft Visual Studio 9.0'
+VS2008_BIN_PATH = os.path.join(VS2008_PATH, 'VC', 'bin')
 
 # a random string we can use for the miniconda installer
 # (to avoid name collisions)
@@ -90,6 +99,13 @@ def execute_sequence(*cmds, **kwargs):
     verbose = kwargs.get('verbose', True)
     for cmd in cmds:
         execute(cmd, verbose)
+
+def extract_zip(zip_path, dest_dir):
+    r"""
+    Extract a zip file to a destination
+    """
+    with zipfile.PyZipFile(str(zip_path)) as z:
+        z.extractall(path=str(dest_dir))
 
 
 def download_file(url, path_to_download):
@@ -254,6 +270,28 @@ def conda_build_package_win(mc, path):
              conda(mc), 'build', '-q', path])
 
 
+def windows_setup_compiler():
+    if PYTHON_VERSION == "2.7":
+        download_file(VS2008_PATCH_URL, VS2008_PATCH_PATH)
+        if not os.path.exists(VS2008_PATCH_FOLDER_PATH):
+            os.makedirs(VS2008_PATCH_FOLDER_PATH)
+        extract_zip(VS2008_PATCH_PATH, VS2008_PATCH_FOLDER_PATH)
+
+        arch = host_arch()
+        if arch == '64bit':
+            execute([os.path.join(VS2008_PATCH_FOLDER_PATH, 'setup_x64.bat')])
+
+            VS2008_AMD64_PATH = os.path.join(VS2008_BIN_PATH, 'amd64')
+            if not os.path.exists(VS2008_AMD64_PATH):
+                os.makedirs(VS2008_AMD64_PATH)
+            shutil.copyfile(os.path.join(VS2008_BIN_PATH, 'vcvars64.bat'),
+                            os.path.join(VS2008_AMD64_PATH, 'vcvarsamd64.bat'))
+        elif arch == '32bit':
+            execute([os.path.join(VS2008_PATCH_FOLDER_PATH, 'setup_x86.bat')])
+        else:
+            raise ValueError('Unexpected architecture {}'.format(arch))
+
+
 def build_conda_package(mc, path, binstar_user=None):
     print('Building package at path {}'.format(path))
     v = get_version(path)
@@ -274,6 +312,9 @@ def build_conda_package(mc, path, binstar_user=None):
         print('building a RC or tag release - no master channel added.')
 
     if host_platform() == 'Windows':
+        # Before building the package, we may need to edit the environment a bit
+        # to handle the nightmare that is Visual Studio compilation
+        windows_setup_compiler()
         conda_build_package_win(mc, path)
     else:
         execute([conda(mc), 'build', '-q', path])
