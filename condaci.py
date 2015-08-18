@@ -281,6 +281,10 @@ def conda_build_package_win(mc, path):
         print('found BINSTAR_KEY in environment on Windows - deleting to '
               'stop vcvarsall from telling the world')
         del os.environ['BINSTAR_KEY']
+    os.environ['PYTHON_ARCH'] = host_arch()[:2]
+    os.environ['PYTHON_VERSION'] = PYTHON_VERSION
+    print('PYTHON_ARCH={} PYTHON_VERSION={}'.format(os.environ['PYTHON_ARCH'],
+                                                    os.environ['PYTHON_VERSION']))
     execute(['cmd', '/E:ON', '/V:ON', '/C', MAGIC_WIN_SCRIPT_PATH,
              conda(mc), 'build', '-q', path])
 
