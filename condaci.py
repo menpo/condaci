@@ -168,6 +168,20 @@ def url_for_platform_version(platform, py_version, arch):
                      arch_str[arch]]) + ext[platform]
 
 
+def appveyor_miniconda_dir():
+    if PYTHON_VERSION == '3.4':
+        conda_dir = r'C:\Miniconda3'
+    elif PYTHON_VERSION == '2.7':
+        conda_dir = r'C:\Miniconda'
+    else:
+        raise ValueError("Python version must be '2.7 or '3.4'")
+
+    if host_arch() == '64bit':
+        conda_dir += '-x64'
+
+    return conda_dir
+
+
 def temp_installer_path():
     # we need a place to download the miniconda installer too. use a random
     # string for the filename to avoid collisions, but choose the dir based
@@ -177,9 +191,11 @@ def temp_installer_path():
 
 
 def miniconda_dir():
-    # the directory where miniconda will be installed too
-    path = (p.expanduser('C:\Miniconda') if host_platform() == 'Windows'
-            else p.expanduser('~/miniconda'))
+    # the directory where miniconda will be installed too/is
+    if host_platform() == 'Windows':
+        path = appveyor_miniconda_dir()
+    else:  # Unix
+        path = p.expanduser('~/miniconda')
     if is_on_jenkins():
         # jenkins persists miniconda installs between builds, but we want a
         # unique miniconda env for each executor
@@ -199,9 +215,10 @@ def miniconda_script_dir_name():
 
 
 # handles to binaries from a miniconda install
+exec_ext = '.exe' if host_platform() == 'Windows' else ''
 miniconda_script_dir = lambda mc: p.join(mc, miniconda_script_dir_name())
-conda = lambda mc: p.join(miniconda_script_dir(mc), 'conda')
-binstar = lambda mc: p.join(miniconda_script_dir(mc), 'anaconda')
+conda = lambda mc: p.join(miniconda_script_dir(mc), 'conda' + exec_ext)
+binstar = lambda mc: p.join(miniconda_script_dir(mc), 'anaconda' + exec_ext)
 
 
 def acquire_miniconda(url, path_to_download):
