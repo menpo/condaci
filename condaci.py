@@ -702,6 +702,7 @@ def binstar_channel_from_ci(path):
 # --------------------------- ARGPARSE COMMANDS ----------------------------- #
 
 def miniconda_dir_cmd(args):
+    set_globals_from_environ()
     print(miniconda_dir())
 
 
