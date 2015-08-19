@@ -22,6 +22,9 @@ VS2008_PATCH_FOLDER_PATH = r'C:\vs2008_patch'
 
 VS2008_PATH = r'C:\Program Files (x86)\Microsoft Visual Studio 9.0'
 VS2008_BIN_PATH = os.path.join(VS2008_PATH, 'VC', 'bin')
+VS2010_PATH = r'C:\Program Files (x86)\Microsoft Visual Studio 10.0'
+VS2010_BIN_PATH = os.path.join(VS2010_PATH, 'VC', 'bin')
+VS2010_AMD64_VCVARS_CMD = r'CALL "C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" /x64'
 
 # a random string we can use for the miniconda installer
 # (to avoid name collisions)
@@ -279,8 +282,7 @@ def conda_build_package_win(mc, path):
               'stop vcvarsall from telling the world')
         del os.environ['BINSTAR_KEY']
     os.environ['PYTHON_ARCH'] = host_arch()[:2]
-    os.environ['PYTHON_VERSION'] = '{}.{}'.format(sys.version_info.major,
-                                                  sys.version_info.minor)
+    os.environ['PYTHON_VERSION'] = PYTHON_VERSION
     print('PYTHON_ARCH={} PYTHON_VERSION={}'.format(os.environ['PYTHON_ARCH'],
                                                     os.environ['PYTHON_VERSION']))
     execute(['cmd', '/E:ON', '/V:ON', '/C', MAGIC_WIN_SCRIPT_PATH,
@@ -288,13 +290,13 @@ def conda_build_package_win(mc, path):
 
 
 def windows_setup_compiler():
-    if PYTHON_VERSION == "2.7":
+    arch = host_arch()
+    if PYTHON_VERSION == '2.7':
         download_file(VS2008_PATCH_URL, VS2008_PATCH_PATH)
         if not os.path.exists(VS2008_PATCH_FOLDER_PATH):
             os.makedirs(VS2008_PATCH_FOLDER_PATH)
         extract_zip(VS2008_PATCH_PATH, VS2008_PATCH_FOLDER_PATH)
 
-        arch = host_arch()
         if arch == '64bit':
             execute([os.path.join(VS2008_PATCH_FOLDER_PATH, 'setup_x64.bat')])
 
@@ -309,6 +311,14 @@ def windows_setup_compiler():
             pass
         else:
             raise ValueError('Unexpected architecture {}'.format(arch))
+    elif PYTHON_VERSION == '3.4' and arch == '64bit':
+        VS2010_AMD64_PATH = os.path.join(VS2010_BIN_PATH, 'amd64')
+        if not os.path.exists(VS2010_AMD64_PATH):
+            os.makedirs(VS2010_AMD64_PATH)
+        VS2010_AMD64_VCVARS_PATH = os.path.join(VS2010_AMD64_PATH,
+                                                'vcvars64.bat')
+        with open(VS2010_AMD64_VCVARS_PATH, 'w') as f:
+            f.write(VS2010_AMD64_VCVARS_CMD)
 
 
 def build_conda_package(mc, path, binstar_user=None):
