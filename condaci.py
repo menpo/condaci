@@ -270,10 +270,9 @@ def setup_miniconda(python_version, installation_path, binstar_user=None):
 
 # ------------------------ CONDA BUILD INTEGRATION -------------------------- #
 
-def get_conda_build_path(path):
-    from conda_build.metadata import MetaData
-    from conda_build.build import bldpkg_path
-    return bldpkg_path(MetaData(path))
+def get_conda_build_path(miniconda_dir, recipe_dir):
+    return subprocess.check_output([conda(miniconda_dir), 'build', recipe_dir,
+                                    '--output']).strip()
 
 
 def conda_build_package_win(mc, path):
@@ -555,20 +554,24 @@ def binstar_upload_if_appropriate(mc, path, user, key):
         channel = binstar_channel_from_ci(path)
         print("Fit to upload to channel '{}'".format(channel))
         binstar_upload_and_purge(mc, key, user, channel,
-                                 get_conda_build_path(path))
+                                 get_conda_build_path(mc, path))
     else:
         print("Cannot upload to binstar - must be a PR.")
 
 
 def binstar_upload_and_purge(mc, key, user, channel, filepath):
-    print('Uploading to {}/{}'.format(user, channel))
-    binstar_upload_unchecked(mc, key, user, channel, filepath)
-    b = login_to_binstar_with_key(key)
-    if channel != 'main':
-        print("Purging old releases from channel '{}'".format(channel))
-        purge_old_binstar_files(b, user, channel, filepath)
+    if not os.path.exists(filepath):
+        raise ValueError('Built file {} does not exist. '
+                         'UPLOAD FAILED.'.format(filepath))
     else:
-        print("On main channel - no purging of releases will be done.")
+        print('Uploading to {}/{}'.format(user, channel))
+        binstar_upload_unchecked(mc, key, user, channel, filepath)
+        b = login_to_binstar_with_key(key)
+        if channel != 'main':
+            print("Purging old releases from channel '{}'".format(channel))
+            purge_old_binstar_files(b, user, channel, filepath)
+        else:
+            print("On main channel - no purging of releases will be done.")
 
 
 # -------------- CONTINUOUS INTEGRATION-SPECIFIC FUNCTIONALITY -------------- #
