@@ -46,9 +46,10 @@ def set_globals_from_environ():
     BINSTAR_KEY = os.environ.get('BINSTAR_KEY')
 
     print('Environment variables extracted:')
-    print('PYTHON_VERSION: {}'.format(PYTHON_VERSION))
-    print('  BINSTAR_USER: {}'.format(BINSTAR_USER))
-    print('   BINSTAR_KEY: {}'.format('*****' if BINSTAR_KEY is not None else '-'))
+    print('  PYTHON_VERSION: {}'.format(PYTHON_VERSION))
+    print('  BINSTAR_USER:   {}'.format(BINSTAR_USER))
+    print('  BINSTAR_KEY:    {}'.format('*****' if BINSTAR_KEY is not None
+                                        else '-'))
 
     if PYTHON_VERSION is None:
         raise ValueError('Fatal: PYTHON_VERSION is not set.')
@@ -271,8 +272,9 @@ def setup_miniconda(python_version, installation_path, binstar_user=None):
 # ------------------------ CONDA BUILD INTEGRATION -------------------------- #
 
 def get_conda_build_path(miniconda_dir, recipe_dir):
-    return subprocess.check_output([conda(miniconda_dir), 'build', recipe_dir,
-                                    '--output']).strip()
+    path_bytes = subprocess.check_output([conda(miniconda_dir), 'build',
+                                          recipe_dir, '--output'])
+    return path_bytes.decode("utf-8").strip()
 
 
 def conda_build_package_win(mc, path):
