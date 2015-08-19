@@ -701,6 +701,10 @@ def binstar_channel_from_ci(path):
 
 # --------------------------- ARGPARSE COMMANDS ----------------------------- #
 
+def miniconda_dir_cmd(args):
+    print(miniconda_dir())
+
+
 def setup_cmd(args):
     set_globals_from_environ()
     mc = miniconda_dir()
@@ -736,8 +740,13 @@ if __name__ == "__main__":
 
     bp = subp.add_parser('build', help='run a conda build')
     bp.add_argument('meta_yaml_dir',
-                    help="path to the dir containing the conda meta.yaml"
+                    help="path to the dir containing the conda 'meta.yaml'"
                          "build script")
+
+    mp = subp.add_parser('miniconda_dir',
+                         help='path to the miniconda root directory')
+    mp.set_defaults(func=miniconda_dir_cmd)
+
     bp.set_defaults(func=build_cmd)
     args = pa.parse_args()
     args.func(args)
