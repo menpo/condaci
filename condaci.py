@@ -38,18 +38,19 @@ BINSTAR_USER = None
 BINSTAR_KEY = None
 
 
-def set_globals_from_environ():
+def set_globals_from_environ(verbose=True):
     global PYTHON_VERSION, BINSTAR_KEY, BINSTAR_USER
 
     PYTHON_VERSION = os.environ.get('PYTHON_VERSION')
     BINSTAR_USER = os.environ.get('BINSTAR_USER')
     BINSTAR_KEY = os.environ.get('BINSTAR_KEY')
 
-    print('Environment variables extracted:')
-    print('  PYTHON_VERSION: {}'.format(PYTHON_VERSION))
-    print('  BINSTAR_USER:   {}'.format(BINSTAR_USER))
-    print('  BINSTAR_KEY:    {}'.format('*****' if BINSTAR_KEY is not None
-                                        else '-'))
+    if verbose:
+        print('Environment variables extracted:')
+        print('  PYTHON_VERSION: {}'.format(PYTHON_VERSION))
+        print('  BINSTAR_USER:   {}'.format(BINSTAR_USER))
+        print('  BINSTAR_KEY:    {}'.format('*****' if BINSTAR_KEY is not None
+                                            else '-'))
 
     if PYTHON_VERSION is None:
         raise ValueError('Fatal: PYTHON_VERSION is not set.')
@@ -702,7 +703,7 @@ def binstar_channel_from_ci(path):
 # --------------------------- ARGPARSE COMMANDS ----------------------------- #
 
 def miniconda_dir_cmd(args):
-    set_globals_from_environ()
+    set_globals_from_environ(verbose=False)
     print(miniconda_dir())
 
 
