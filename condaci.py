@@ -54,9 +54,9 @@ def set_globals_from_environ(verbose=True):
 
     if PYTHON_VERSION is None:
         raise ValueError('Fatal: PYTHON_VERSION is not set.')
-    if PYTHON_VERSION not in ['2.7', '3.4']:
+    if PYTHON_VERSION not in ['2.7', '3.4', '3.5']:
         raise ValueError("Fatal: PYTHON_VERSION '{}' is invalid - must be "
-                         "either '2.7' or '3.4'".format(PYTHON_VERSION))
+                         "either '2.7', '3.4' or '3.5'".format(PYTHON_VERSION))
 
 
 # ------------------------------ UTILITIES ---------------------------------- #
@@ -164,22 +164,22 @@ def url_for_platform_version(platform, py_version, arch):
            'Darwin': '.sh',
            'Windows': '.exe'}
 
-    if py_version == '3.4':
+    if py_version in ['3.4', '3.5']:
         base_url = base_url + '3'
     elif py_version != '2.7':
-        raise ValueError("Python version must be '2.7 or '3.4'")
+        raise ValueError("Python version must be '2.7', '3.4' or '3.5'")
     return '-'.join([base_url, version,
                      platform_str[platform],
                      arch_str[arch]]) + ext[platform]
 
 
 def appveyor_miniconda_dir():
-    if PYTHON_VERSION == '3.4':
+    if PYTHON_VERSION in ['3.4', '3.5']:
         conda_dir = r'C:\Miniconda3'
     elif PYTHON_VERSION == '2.7':
         conda_dir = r'C:\Miniconda'
     else:
-        raise ValueError("Python version must be '2.7 or '3.4'")
+        raise ValueError("Python version must be '2.7', '3.4' or '3.5'")
 
     if host_arch() == '64bit':
         conda_dir += '-x64'
