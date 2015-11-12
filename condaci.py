@@ -34,12 +34,13 @@ RANDOM_UUID = uuid.uuid4()
 
 # Key globals that need to be set for the rest of the script.
 PYTHON_VERSION = None
+PYTHON_VERSION_NO_DOT = None
 BINSTAR_USER = None
 BINSTAR_KEY = None
 
 
 def set_globals_from_environ(verbose=True):
-    global PYTHON_VERSION, BINSTAR_KEY, BINSTAR_USER
+    global PYTHON_VERSION, BINSTAR_KEY, BINSTAR_USER, PYTHON_VERSION_NO_DOT
 
     PYTHON_VERSION = os.environ.get('PYTHON_VERSION')
     BINSTAR_USER = os.environ.get('BINSTAR_USER')
@@ -57,6 +58,9 @@ def set_globals_from_environ(verbose=True):
     if PYTHON_VERSION not in ['2.7', '3.4', '3.5']:
         raise ValueError("Fatal: PYTHON_VERSION '{}' is invalid - must be "
                          "either '2.7', '3.4' or '3.5'".format(PYTHON_VERSION))
+
+    # Required when setting Python version in conda
+    PYTHON_VERSION_NO_DOT = PYTHON_VERSION.replace('.', '')
 
 
 # ------------------------------ UTILITIES ---------------------------------- #
@@ -104,6 +108,7 @@ def execute_sequence(*cmds, **kwargs):
     verbose = kwargs.get('verbose', True)
     for cmd in cmds:
         execute(cmd, verbose)
+
 
 def extract_zip(zip_path, dest_dir):
     r"""
@@ -165,7 +170,7 @@ def url_for_platform_version(platform, py_version, arch):
            'Windows': '.exe'}
 
     if py_version in ['3.4', '3.5']:
-        base_url = base_url + '3'
+        base_url += '3'
     elif py_version != '2.7':
         raise ValueError("Python version must be '2.7', '3.4' or '3.5'")
     return '-'.join([base_url, version,
@@ -272,8 +277,8 @@ def setup_miniconda(python_version, installation_path, binstar_user=None):
 
 # ------------------------ CONDA BUILD INTEGRATION -------------------------- #
 
-def get_conda_build_path(miniconda_dir, recipe_dir):
-    path_bytes = subprocess.check_output([conda(miniconda_dir), 'build',
+def get_conda_build_path(mc_dir, recipe_dir):
+    path_bytes = subprocess.check_output([conda(mc_dir), 'build',
                                           recipe_dir, '--output'])
     return path_bytes.decode("utf-8").strip()
 
@@ -288,7 +293,8 @@ def conda_build_package_win(mc, path):
     print('PYTHON_ARCH={} PYTHON_VERSION={}'.format(os.environ['PYTHON_ARCH'],
                                                     os.environ['PYTHON_VERSION']))
     execute(['cmd', '/E:ON', '/V:ON', '/C', MAGIC_WIN_SCRIPT_PATH,
-             conda(mc), 'build', '-q', path])
+             conda(mc), 'build', '-q', path,
+             '--py={}'.format(PYTHON_VERSION_NO_DOT)])
 
 
 def windows_setup_compiler():
@@ -329,6 +335,9 @@ def build_conda_package(mc, path, binstar_user=None):
     print('Detected version: {}'.format(v))
     print('Setting CONDACI_VERSION environment variable to {}'.format(v))
     os.environ['CONDACI_VERSION'] = v
+    print('Setting CONDA_PY environment variable to {}'.format(
+        PYTHON_VERSION_NO_DOT))
+    os.environ['CONDA_PY'] = PYTHON_VERSION_NO_DOT
 
     # we want to add the master channel when doing dev builds to source our
     # other dev dependencies
@@ -348,7 +357,8 @@ def build_conda_package(mc, path, binstar_user=None):
         windows_setup_compiler()
         conda_build_package_win(mc, path)
     else:
-        execute([conda(mc), 'build', '-q', path])
+        execute([conda(mc), 'build', '-q', path,
+                 '--py={}'.format(PYTHON_VERSION_NO_DOT)])
 
 
 # ------------------------- VERSIONING INTEGRATION -------------------------- #
@@ -702,12 +712,12 @@ def binstar_channel_from_ci(path):
 
 # --------------------------- ARGPARSE COMMANDS ----------------------------- #
 
-def miniconda_dir_cmd(args):
+def miniconda_dir_cmd(_):
     set_globals_from_environ(verbose=False)
     print(miniconda_dir())
 
 
-def setup_cmd(args):
+def setup_cmd(_):
     set_globals_from_environ()
     mc = miniconda_dir()
     setup_miniconda(PYTHON_VERSION, mc, binstar_user=BINSTAR_USER)
@@ -726,7 +736,7 @@ def build_cmd(args):
     build_conda_package(mc, conda_meta, binstar_user=BINSTAR_USER)
     print('successfully built conda package, proceeding to upload')
     binstar_upload_if_appropriate(mc, conda_meta, BINSTAR_USER, BINSTAR_KEY)
-    #upload_to_pypi_if_appropriate(mc, args.pypiuser, args.pypipassword)
+    # upload_to_pypi_if_appropriate(mc, args.pypiuser, args.pypipassword)
 
 
 if __name__ == "__main__":
