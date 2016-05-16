@@ -14,11 +14,9 @@ from pprint import pprint
 # we will use for this script.
 import zipfile
 
-MAGIC_WIN_SCRIPT_URL = 'https://raw.githubusercontent.com/menpo/condaci/master/run_with_env.cmd'
-MAGIC_WIN_SCRIPT_PATH = r'C:\run_with_env.cmd'
-VS2008_PATCH_URL = 'https://raw.githubusercontent.com/menpo/condaci/master/vs2008_patch.zip'
-VS2008_PATCH_PATH = r'C:\vs2008_patch.zip'
-VS2008_PATCH_FOLDER_PATH = r'C:\vs2008_patch'
+SUPPORTED_PY_VERS = ['2.7', '3.3', '3.4', '3.5']
+SUPPORTED_ERR_MSG = 'FATAL: Python version not supported, must be one of {}'.format(
+    SUPPORTED_PY_VERS)
 
 VS2008_PATH = r'C:\Program Files (x86)\Microsoft Visual Studio 9.0'
 VS2008_BIN_PATH = os.path.join(VS2008_PATH, 'VC', 'bin')
@@ -54,10 +52,10 @@ def set_globals_from_environ(verbose=True):
                                             else '-'))
 
     if PYTHON_VERSION is None:
-        raise ValueError('Fatal: PYTHON_VERSION is not set.')
-    if PYTHON_VERSION not in ['2.7', '3.4', '3.5']:
-        raise ValueError("Fatal: PYTHON_VERSION '{}' is invalid - must be "
-                         "either '2.7', '3.4' or '3.5'".format(PYTHON_VERSION))
+        raise ValueError('FATAL: PYTHON_VERSION is not set.')
+    if PYTHON_VERSION not in SUPPORTED_PY_VERS:
+        raise ValueError("FATAL: PYTHON_VERSION '{}' is invalid - must be "
+                         "one of {}".format(PYTHON_VERSION, SUPPORTED_PY_VERS))
 
     # Required when setting Python version in conda
     PYTHON_VERSION_NO_DOT = PYTHON_VERSION.replace('.', '')
@@ -169,22 +167,24 @@ def url_for_platform_version(platform, py_version, arch):
            'Darwin': '.sh',
            'Windows': '.exe'}
 
-    if py_version in ['3.4', '3.5']:
+    # Python 3 versions
+    if py_version in SUPPORTED_PY_VERS[-3:]:
         base_url += '3'
     elif py_version != '2.7':
-        raise ValueError("Python version must be '2.7', '3.4' or '3.5'")
+        raise ValueError(SUPPORTED_ERR_MSG)
     return '-'.join([base_url, version,
                      platform_str[platform],
                      arch_str[arch]]) + ext[platform]
 
 
 def appveyor_miniconda_dir():
-    if PYTHON_VERSION in ['3.4', '3.5']:
+    # Python 3 versions
+    if PYTHON_VERSION in SUPPORTED_PY_VERS[-3:]:
         conda_dir = r'C:\Miniconda3'
     elif PYTHON_VERSION == '2.7':
         conda_dir = r'C:\Miniconda'
     else:
-        raise ValueError("Python version must be '2.7', '3.4' or '3.5'")
+        raise ValueError(SUPPORTED_ERR_MSG)
 
     if host_arch() == '64bit':
         conda_dir += '-x64'
