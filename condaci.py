@@ -150,7 +150,8 @@ def host_arch():
             elif av_platform == 'x64':
                 arch = '64bit'
             else:
-                print('Was unable to interpret the platform "{}"'.format())
+                print('Was unable to interpret the platform "{}"'.format(
+                    av_platform))
     return arch
 
 
