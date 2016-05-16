@@ -727,6 +727,10 @@ def build_cmd(args):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print('usage: condaci.py [-h] {setup,build,miniconda_dir} ...')
+        sys.exit(1)
+
     from argparse import ArgumentParser
     pa = ArgumentParser(
         description=r"""
