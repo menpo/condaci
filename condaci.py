@@ -18,9 +18,10 @@ SUPPORTED_PY_VERS = ['2.7', '3.3', '3.4', '3.5']
 SUPPORTED_ERR_MSG = 'FATAL: Python version not supported, must be one of {}'.format(
     SUPPORTED_PY_VERS)
 
-VS2008_PATH = r'C:\Program Files (x86)\Microsoft Visual Studio 9.0'
+PROGRAM_FILES = os.environ.get('PROGRAMFILES(x86)', os.environ.get('PROGRAMFILES'))
+VS2008_PATH = os.path.join(PROGRAM_FILES, 'Microsoft Visual Studio 9.0')
 VS2008_BIN_PATH = os.path.join(VS2008_PATH, 'VC', 'bin')
-VS2010_PATH = r'C:\Program Files (x86)\Microsoft Visual Studio 10.0'
+VS2010_PATH = os.path.join(PROGRAM_FILES, 'Microsoft Visual Studio 10.0')
 VS2010_BIN_PATH = os.path.join(VS2010_PATH, 'VC', 'bin')
 VS2010_AMD64_VCVARS_CMD = r'CALL "C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" /x64'
 
