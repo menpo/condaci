@@ -18,7 +18,7 @@ SUPPORTED_PY_VERS = ['2.7', '3.3', '3.4', '3.5']
 SUPPORTED_ERR_MSG = 'FATAL: Python version not supported, must be one of {}'.format(
     SUPPORTED_PY_VERS)
 
-PROGRAM_FILES = os.environ.get('PROGRAMFILES(x86)', os.environ.get('PROGRAMFILES'))
+PROGRAM_FILES = os.environ.get('PROGRAMFILES(x86)', os.environ.get('PROGRAMFILES', ''))
 VS2008_PATH = os.path.join(PROGRAM_FILES, 'Microsoft Visual Studio 9.0')
 VS2008_BIN_PATH = os.path.join(VS2008_PATH, 'VC', 'bin')
 VS2010_PATH = os.path.join(PROGRAM_FILES, 'Microsoft Visual Studio 10.0')
