@@ -294,39 +294,29 @@ def conda_build_package_win(mc, path):
     os.environ['PYTHON_VERSION'] = PYTHON_VERSION
     print('PYTHON_ARCH={} PYTHON_VERSION={}'.format(os.environ['PYTHON_ARCH'],
                                                     os.environ['PYTHON_VERSION']))
-    execute(['cmd', '/E:ON', '/V:ON', '/C', MAGIC_WIN_SCRIPT_PATH,
-             conda(mc), 'build', '-q', path,
+    execute([conda(mc), 'build', '-q', path,
              '--py={}'.format(PYTHON_VERSION_NO_DOT)])
 
 
 def windows_setup_compiler():
     arch = host_arch()
-    if PYTHON_VERSION == '2.7':
-        download_file(VS2008_PATCH_URL, VS2008_PATCH_PATH)
-        if not os.path.exists(VS2008_PATCH_FOLDER_PATH):
-            os.makedirs(VS2008_PATCH_FOLDER_PATH)
-        extract_zip(VS2008_PATCH_PATH, VS2008_PATCH_FOLDER_PATH)
-
-        if arch == '64bit':
-            execute([os.path.join(VS2008_PATCH_FOLDER_PATH, 'setup_x64.bat')])
-
-            VS2008_AMD64_PATH = os.path.join(VS2008_BIN_PATH, 'amd64')
-            if not os.path.exists(VS2008_AMD64_PATH):
-                os.makedirs(VS2008_AMD64_PATH)
-            shutil.copyfile(os.path.join(VS2008_BIN_PATH, 'vcvars64.bat'),
-                            os.path.join(VS2008_AMD64_PATH, 'vcvarsamd64.bat'))
-        elif arch == '32bit':
-            # For some reason these files seems to be missing on Appveyor
-            # execute([os.path.join(VS2008_PATCH_FOLDER_PATH, 'setup_x86.bat')])
-            pass
-        else:
-            raise ValueError('Unexpected architecture {}'.format(arch))
+    if PYTHON_VERSION == '2.7' and arch == '64bit':
+        VS2008_AMD64_PATH = os.path.join(VS2008_BIN_PATH, 'amd64')
+        if not os.path.exists(VS2008_AMD64_PATH):
+            os.makedirs(VS2008_AMD64_PATH)
+        VCVARS64_PATH = os.path.join(VS2008_BIN_PATH, 'vcvars64.bat')
+        VCVARSAMD64_PATH = os.path.join(VS2008_AMD64_PATH, 'vcvarsamd64.bat')
+        print("Copying '{}' to '{}' to fix VS2008 64-bit configuration.".format(
+                  VCVARS64_PATH, VCVARSAMD64_PATH))
+        shutil.copyfile(VCVARS64_PATH, VCVARSAMD64_PATH)
     elif PYTHON_VERSION == '3.4' and arch == '64bit':
         VS2010_AMD64_PATH = os.path.join(VS2010_BIN_PATH, 'amd64')
         if not os.path.exists(VS2010_AMD64_PATH):
             os.makedirs(VS2010_AMD64_PATH)
         VS2010_AMD64_VCVARS_PATH = os.path.join(VS2010_AMD64_PATH,
                                                 'vcvars64.bat')
+        print("Writing '{}' to '{}' to fix VS2010 64-bit configuration.".format(
+            VS2010_AMD64_VCVARS_CMD, VS2010_AMD64_VCVARS_PATH))
         with open(VS2010_AMD64_VCVARS_PATH, 'w') as f:
             f.write(VS2010_AMD64_VCVARS_CMD)
 
@@ -729,11 +719,6 @@ def build_cmd(args):
     set_globals_from_environ()
     mc = miniconda_dir()
     conda_meta = args.meta_yaml_dir
-
-    if host_platform() == 'Windows':
-        print('downloading magical Windows SDK configuration'
-              ' script to {}'.format(MAGIC_WIN_SCRIPT_PATH))
-        download_file(MAGIC_WIN_SCRIPT_URL, MAGIC_WIN_SCRIPT_PATH)
 
     build_conda_package(mc, conda_meta, binstar_user=BINSTAR_USER)
     print('successfully built conda package, proceeding to upload')
