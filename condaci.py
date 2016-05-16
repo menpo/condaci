@@ -272,8 +272,8 @@ def setup_miniconda(python_version, installation_path, binstar_user=None):
         print("(adding user channel '{}' for dependencies to root config)".format(binstar_user))
         cmds.append([conda_cmd, 'config', '--system', '--add', 'channels', binstar_user])
     else:
-        print("No user channels have been configured (all dependencies have to be "
-              "sourced from anaconda)")
+        print('No user channels have been configured (all dependencies have to '
+              'be sourced from anaconda)')
     execute_sequence(*cmds)
 
 
