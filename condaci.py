@@ -15,7 +15,11 @@ from pprint import pprint
 # we will use for this script.
 import zipfile
 
-SUPPORTED_PY_VERS = ['2.7', '3.3', '3.4', '3.5']
+VS9_PY_VERS = ['2.7']
+VS10_PY_VERS = ['3.3', '3.4']
+VS14_PY_VERS = ['3.5']
+SUPPORTED_PY_VERS = VS9_PY_VERS + VS10_PY_VERS + VS14_PY_VERS
+
 SUPPORTED_ERR_MSG = 'FATAL: Python version not supported, must be one of {}'.format(
     SUPPORTED_PY_VERS)
 
@@ -185,8 +189,8 @@ def url_for_platform_version(platform, py_version, arch):
            'Darwin': '.sh',
            'Windows': '.exe'}
 
-    # Python 3 versions
-    if py_version in SUPPORTED_PY_VERS[-3:]:
+    # Python 3 versions (we won't support previous to 2.7)
+    if py_version in SUPPORTED_PY_VERS[1:]:
         base_url += '3'
     elif py_version != '2.7':
         raise ValueError(SUPPORTED_ERR_MSG)
@@ -196,8 +200,8 @@ def url_for_platform_version(platform, py_version, arch):
 
 
 def appveyor_miniconda_dir():
-    # Python 3 versions
-    if PYTHON_VERSION in SUPPORTED_PY_VERS[-3:]:
+    # Python 3 versions (we won't support previous to 2.7)
+    if PYTHON_VERSION in SUPPORTED_PY_VERS[1:]:
         conda_dir = r'C:\Miniconda3'
     elif PYTHON_VERSION == '2.7':
         conda_dir = r'C:\Miniconda'
@@ -318,7 +322,7 @@ def conda_build_package_win(mc, path):
 
 def windows_setup_compiler():
     arch = host_arch()
-    if PYTHON_VERSION == '2.7' and arch == '64bit':
+    if PYTHON_VERSION in VS9_PY_VERS and arch == '64bit':
         VS2008_AMD64_PATH = os.path.join(VS2008_BIN_PATH, 'amd64')
         if not os.path.exists(VS2008_AMD64_PATH):
             os.makedirs(VS2008_AMD64_PATH)
@@ -328,7 +332,7 @@ def windows_setup_compiler():
                   VCVARS64_PATH, VCVARSAMD64_PATH))
         shutil.copyfile(VCVARS64_PATH, VCVARSAMD64_PATH)
     # Python 3.3 or 3.4
-    elif PYTHON_VERSION in SUPPORTED_PY_VERS[1:-1] and arch == '64bit':
+    elif PYTHON_VERSION in VS10_PY_VERS and arch == '64bit':
         VS2010_AMD64_PATH = os.path.join(VS2010_BIN_PATH, 'amd64')
         if not os.path.exists(VS2010_AMD64_PATH):
             os.makedirs(VS2010_AMD64_PATH)
