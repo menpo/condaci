@@ -24,7 +24,7 @@ VS2008_PATH = os.path.join(PROGRAM_FILES, 'Microsoft Visual Studio 9.0')
 VS2008_BIN_PATH = os.path.join(VS2008_PATH, 'VC', 'bin')
 VS2010_PATH = os.path.join(PROGRAM_FILES, 'Microsoft Visual Studio 10.0')
 VS2010_BIN_PATH = os.path.join(VS2010_PATH, 'VC', 'bin')
-VS2010_AMD64_VCVARS_CMD = r'CALL "C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" /x64'
+VS2010_AMD64_VCVARS_CMD = r'CALL "C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" /x64 /Release'
 
 # a random string we can use for the miniconda installer
 # (to avoid name collisions)
