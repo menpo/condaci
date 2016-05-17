@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import subprocess
 import os
+import contextlib
 import shutil
 import os.path as p
 from functools import partial
@@ -63,6 +64,21 @@ def set_globals_from_environ(verbose=True):
 
 
 # ------------------------------ UTILITIES ---------------------------------- #
+
+
+class FakeSink(object):
+
+    def write(self, *args, **kwargs):
+        pass
+
+
+@contextlib.contextmanager
+def suppress_stdout():
+    cached_stdout = sys.stdout
+    sys.stdout = FakeSink()
+    yield
+    sys.stdout = cached_stdout
+
 
 # forward stderr to stdout
 check = partial(subprocess.check_call, stderr=subprocess.STDOUT)
@@ -279,10 +295,12 @@ def setup_miniconda(python_version, installation_path, binstar_user=None):
 
 # ------------------------ CONDA BUILD INTEGRATION -------------------------- #
 
-def get_conda_build_path(mc_dir, recipe_dir):
-    path_bytes = subprocess.check_output([conda(mc_dir), 'build',
-                                          recipe_dir, '--output'])
-    return path_bytes.decode("utf-8").strip()
+def get_conda_build_path(recipe_dir):
+    from conda_build.render import render_recipe
+    from conda_build.build import bldpkg_path
+    with suppress_stdout():
+        m, _ = render_recipe(recipe_dir, no_download_source=False)
+    return bldpkg_path(m).strip()
 
 
 def conda_build_package_win(mc, path):
@@ -560,7 +578,7 @@ def binstar_upload_if_appropriate(mc, path, user, key):
         channel = binstar_channel_from_ci(path)
         print("Fit to upload to channel '{}'".format(channel))
         binstar_upload_and_purge(mc, key, user, channel,
-                                 get_conda_build_path(mc, path))
+                                 get_conda_build_path(path))
     else:
         print("Cannot upload to binstar - must be a PR.")
 
