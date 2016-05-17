@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import subprocess
 import os
+import contextlib
 import shutil
 import os.path as p
 from functools import partial
@@ -14,17 +15,20 @@ from pprint import pprint
 # we will use for this script.
 import zipfile
 
-MAGIC_WIN_SCRIPT_URL = 'https://raw.githubusercontent.com/menpo/condaci/master/run_with_env.cmd'
-MAGIC_WIN_SCRIPT_PATH = r'C:\run_with_env.cmd'
-VS2008_PATCH_URL = 'https://raw.githubusercontent.com/menpo/condaci/master/vs2008_patch.zip'
-VS2008_PATCH_PATH = r'C:\vs2008_patch.zip'
-VS2008_PATCH_FOLDER_PATH = r'C:\vs2008_patch'
+VS9_PY_VERS = ['2.7']
+VS10_PY_VERS = ['3.3', '3.4']
+VS14_PY_VERS = ['3.5']
+SUPPORTED_PY_VERS = VS9_PY_VERS + VS10_PY_VERS + VS14_PY_VERS
 
-VS2008_PATH = r'C:\Program Files (x86)\Microsoft Visual Studio 9.0'
+SUPPORTED_ERR_MSG = 'FATAL: Python version not supported, must be one of {}'.format(
+    SUPPORTED_PY_VERS)
+
+PROGRAM_FILES = os.environ.get('PROGRAMFILES(x86)', os.environ.get('PROGRAMFILES', ''))
+VS2008_PATH = os.path.join(PROGRAM_FILES, 'Microsoft Visual Studio 9.0')
 VS2008_BIN_PATH = os.path.join(VS2008_PATH, 'VC', 'bin')
-VS2010_PATH = r'C:\Program Files (x86)\Microsoft Visual Studio 10.0'
+VS2010_PATH = os.path.join(PROGRAM_FILES, 'Microsoft Visual Studio 10.0')
 VS2010_BIN_PATH = os.path.join(VS2010_PATH, 'VC', 'bin')
-VS2010_AMD64_VCVARS_CMD = r'CALL "C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" /x64'
+VS2010_AMD64_VCVARS_CMD = r'CALL "C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" /x64 /Release'
 
 # a random string we can use for the miniconda installer
 # (to avoid name collisions)
@@ -54,16 +58,31 @@ def set_globals_from_environ(verbose=True):
                                             else '-'))
 
     if PYTHON_VERSION is None:
-        raise ValueError('Fatal: PYTHON_VERSION is not set.')
-    if PYTHON_VERSION not in ['2.7', '3.4', '3.5']:
-        raise ValueError("Fatal: PYTHON_VERSION '{}' is invalid - must be "
-                         "either '2.7', '3.4' or '3.5'".format(PYTHON_VERSION))
+        raise ValueError('FATAL: PYTHON_VERSION is not set.')
+    if PYTHON_VERSION not in SUPPORTED_PY_VERS:
+        raise ValueError("FATAL: PYTHON_VERSION '{}' is invalid - must be "
+                         "one of {}".format(PYTHON_VERSION, SUPPORTED_PY_VERS))
 
     # Required when setting Python version in conda
     PYTHON_VERSION_NO_DOT = PYTHON_VERSION.replace('.', '')
 
 
 # ------------------------------ UTILITIES ---------------------------------- #
+
+
+class FakeSink(object):
+
+    def write(self, *args, **kwargs):
+        pass
+
+
+@contextlib.contextmanager
+def suppress_stdout():
+    cached_stdout = sys.stdout
+    sys.stdout = FakeSink()
+    yield
+    sys.stdout = cached_stdout
+
 
 # forward stderr to stdout
 check = partial(subprocess.check_call, stderr=subprocess.STDOUT)
@@ -83,10 +102,10 @@ def execute(cmd, verbose=True, env_additions=None):
                                          for k, v in env_additions.items()])))
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, env=env_for_p)
-    sentinal = ''
+    sentinel = ''
     if sys.version_info.major == 3:
-        sentinal = b''
-    for line in iter(proc.stdout.readline, sentinal):
+        sentinel = b''
+    for line in iter(proc.stdout.readline, sentinel):
         if verbose:
             if sys.version_info.major == 3:
                 # convert bytes to string
@@ -151,7 +170,8 @@ def host_arch():
             elif av_platform == 'x64':
                 arch = '64bit'
             else:
-                print('Was unable to interpret the platform "{}"'.format())
+                print('Was unable to interpret the platform "{}"'.format(
+                    av_platform))
     return arch
 
 
@@ -169,22 +189,24 @@ def url_for_platform_version(platform, py_version, arch):
            'Darwin': '.sh',
            'Windows': '.exe'}
 
-    if py_version in ['3.4', '3.5']:
+    # Python 3 versions (we won't support previous to 2.7)
+    if py_version in SUPPORTED_PY_VERS[1:]:
         base_url += '3'
     elif py_version != '2.7':
-        raise ValueError("Python version must be '2.7', '3.4' or '3.5'")
+        raise ValueError(SUPPORTED_ERR_MSG)
     return '-'.join([base_url, version,
                      platform_str[platform],
                      arch_str[arch]]) + ext[platform]
 
 
 def appveyor_miniconda_dir():
-    if PYTHON_VERSION in ['3.4', '3.5']:
+    # Python 3 versions (we won't support previous to 2.7)
+    if PYTHON_VERSION in SUPPORTED_PY_VERS[1:]:
         conda_dir = r'C:\Miniconda3'
     elif PYTHON_VERSION == '2.7':
         conda_dir = r'C:\Miniconda'
     else:
-        raise ValueError("Python version must be '2.7', '3.4' or '3.5'")
+        raise ValueError(SUPPORTED_ERR_MSG)
 
     if host_arch() == '64bit':
         conda_dir += '-x64'
@@ -270,17 +292,19 @@ def setup_miniconda(python_version, installation_path, binstar_user=None):
         print("(adding user channel '{}' for dependencies to root config)".format(binstar_user))
         cmds.append([conda_cmd, 'config', '--system', '--add', 'channels', binstar_user])
     else:
-        print("No user channels have been configured (all dependencies have to be "
-              "sourced from anaconda)")
+        print('No user channels have been configured (all dependencies have to '
+              'be sourced from anaconda)')
     execute_sequence(*cmds)
 
 
 # ------------------------ CONDA BUILD INTEGRATION -------------------------- #
 
-def get_conda_build_path(mc_dir, recipe_dir):
-    path_bytes = subprocess.check_output([conda(mc_dir), 'build',
-                                          recipe_dir, '--output'])
-    return path_bytes.decode("utf-8").strip()
+def get_conda_build_path(recipe_dir):
+    from conda_build.render import render_recipe
+    from conda_build.build import bldpkg_path
+    with suppress_stdout():
+        m, _ = render_recipe(recipe_dir, no_download_source=False)
+    return bldpkg_path(m).strip()
 
 
 def conda_build_package_win(mc, path):
@@ -292,39 +316,30 @@ def conda_build_package_win(mc, path):
     os.environ['PYTHON_VERSION'] = PYTHON_VERSION
     print('PYTHON_ARCH={} PYTHON_VERSION={}'.format(os.environ['PYTHON_ARCH'],
                                                     os.environ['PYTHON_VERSION']))
-    execute(['cmd', '/E:ON', '/V:ON', '/C', MAGIC_WIN_SCRIPT_PATH,
-             conda(mc), 'build', '-q', path,
+    execute([conda(mc), 'build', '-q', path,
              '--py={}'.format(PYTHON_VERSION_NO_DOT)])
 
 
 def windows_setup_compiler():
     arch = host_arch()
-    if PYTHON_VERSION == '2.7':
-        download_file(VS2008_PATCH_URL, VS2008_PATCH_PATH)
-        if not os.path.exists(VS2008_PATCH_FOLDER_PATH):
-            os.makedirs(VS2008_PATCH_FOLDER_PATH)
-        extract_zip(VS2008_PATCH_PATH, VS2008_PATCH_FOLDER_PATH)
-
-        if arch == '64bit':
-            execute([os.path.join(VS2008_PATCH_FOLDER_PATH, 'setup_x64.bat')])
-
-            VS2008_AMD64_PATH = os.path.join(VS2008_BIN_PATH, 'amd64')
-            if not os.path.exists(VS2008_AMD64_PATH):
-                os.makedirs(VS2008_AMD64_PATH)
-            shutil.copyfile(os.path.join(VS2008_BIN_PATH, 'vcvars64.bat'),
-                            os.path.join(VS2008_AMD64_PATH, 'vcvarsamd64.bat'))
-        elif arch == '32bit':
-            # For some reason these files seems to be missing on Appveyor
-            # execute([os.path.join(VS2008_PATCH_FOLDER_PATH, 'setup_x86.bat')])
-            pass
-        else:
-            raise ValueError('Unexpected architecture {}'.format(arch))
-    elif PYTHON_VERSION == '3.4' and arch == '64bit':
+    if PYTHON_VERSION in VS9_PY_VERS and arch == '64bit':
+        VS2008_AMD64_PATH = os.path.join(VS2008_BIN_PATH, 'amd64')
+        if not os.path.exists(VS2008_AMD64_PATH):
+            os.makedirs(VS2008_AMD64_PATH)
+        VCVARS64_PATH = os.path.join(VS2008_BIN_PATH, 'vcvars64.bat')
+        VCVARSAMD64_PATH = os.path.join(VS2008_AMD64_PATH, 'vcvarsamd64.bat')
+        print("Copying '{}' to '{}' to fix VS2008 64-bit configuration.".format(
+                  VCVARS64_PATH, VCVARSAMD64_PATH))
+        shutil.copyfile(VCVARS64_PATH, VCVARSAMD64_PATH)
+    # Python 3.3 or 3.4
+    elif PYTHON_VERSION in VS10_PY_VERS and arch == '64bit':
         VS2010_AMD64_PATH = os.path.join(VS2010_BIN_PATH, 'amd64')
         if not os.path.exists(VS2010_AMD64_PATH):
             os.makedirs(VS2010_AMD64_PATH)
         VS2010_AMD64_VCVARS_PATH = os.path.join(VS2010_AMD64_PATH,
                                                 'vcvars64.bat')
+        print("Writing '{}' to '{}' to fix VS2010 64-bit configuration.".format(
+            VS2010_AMD64_VCVARS_CMD, VS2010_AMD64_VCVARS_PATH))
         with open(VS2010_AMD64_VCVARS_PATH, 'w') as f:
             f.write(VS2010_AMD64_VCVARS_CMD)
 
@@ -567,7 +582,7 @@ def binstar_upload_if_appropriate(mc, path, user, key):
         channel = binstar_channel_from_ci(path)
         print("Fit to upload to channel '{}'".format(channel))
         binstar_upload_and_purge(mc, key, user, channel,
-                                 get_conda_build_path(mc, path))
+                                 get_conda_build_path(path))
     else:
         print("Cannot upload to binstar - must be a PR.")
 
@@ -728,11 +743,6 @@ def build_cmd(args):
     mc = miniconda_dir()
     conda_meta = args.meta_yaml_dir
 
-    if host_platform() == 'Windows':
-        print('downloading magical Windows SDK configuration'
-              ' script to {}'.format(MAGIC_WIN_SCRIPT_PATH))
-        download_file(MAGIC_WIN_SCRIPT_URL, MAGIC_WIN_SCRIPT_PATH)
-
     build_conda_package(mc, conda_meta, binstar_user=BINSTAR_USER)
     print('successfully built conda package, proceeding to upload')
     binstar_upload_if_appropriate(mc, conda_meta, BINSTAR_USER, BINSTAR_KEY)
@@ -740,6 +750,10 @@ def build_cmd(args):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print('usage: condaci.py [-h] {setup,build,miniconda_dir} ...')
+        sys.exit(1)
+
     from argparse import ArgumentParser
     pa = ArgumentParser(
         description=r"""
