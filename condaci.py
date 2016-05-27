@@ -265,7 +265,9 @@ def acquire_miniconda(url, path_to_download):
 def install_miniconda(path_to_installer, path_to_install):
     print('Installing miniconda to {}'.format(path_to_install))
     if is_windows():
-        execute([path_to_installer, '/S', '/D={}'.format(path_to_install)])
+        execute([path_to_installer, '/InstallationType=AllUsers',
+                 '/AddToPath=0', '/RegisterPath=1', '/NoRegistry=1',
+                 '/S', '/D={}'.format(path_to_install)])
     else:
         execute(['chmod', '+x', path_to_installer])
         execute([path_to_installer, '-b', '-p', path_to_install])
