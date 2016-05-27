@@ -37,18 +37,31 @@ PYTHON_VERSION = None
 PYTHON_VERSION_NO_DOT = None
 BINSTAR_USER = None
 BINSTAR_KEY = None
+ARCH = None
 
 
 def set_globals_from_environ(verbose=True):
-    global PYTHON_VERSION, BINSTAR_KEY, BINSTAR_USER, PYTHON_VERSION_NO_DOT
+    global PYTHON_VERSION, BINSTAR_KEY, BINSTAR_USER, PYTHON_VERSION_NO_DOT, ARCH
+
+    if not (is_on_appveyor() or is_on_travis() or is_on_jenkins()):
+        raise ValueError('FATAL: Unknown CI system.')
 
     PYTHON_VERSION = os.environ.get('PYTHON_VERSION')
+    if 'ARCH' in os.environ:
+        ARCH = os.environ.get('ARCH')
+        arch_origin = 'Environment'
+    else:
+        # If we weren't given the ARCH variable (as on Jenkins) then predict
+        # the architecture from the Python version (x86 or x64)
+        ARCH = python_arch()
+        arch_origin = 'Python'
     BINSTAR_USER = os.environ.get('BINSTAR_USER')
     BINSTAR_KEY = os.environ.get('BINSTAR_KEY')
 
     if verbose:
         print('Environment variables extracted:')
         print('  PYTHON_VERSION: {}'.format(PYTHON_VERSION))
+        print('  ARCH:           {} - ({})'.format(ARCH, arch_origin))
         print('  BINSTAR_USER:   {}'.format(BINSTAR_USER))
         print('  BINSTAR_KEY:    {}'.format('*****' if BINSTAR_KEY is not None
                                             else '-'))
@@ -58,6 +71,8 @@ def set_globals_from_environ(verbose=True):
     if PYTHON_VERSION not in SUPPORTED_PY_VERS:
         raise ValueError("FATAL: PYTHON_VERSION '{}' is invalid - must be "
                          "one of {}".format(PYTHON_VERSION, SUPPORTED_PY_VERS))
+    if ARCH is None:
+        raise ValueError('FATAL: ARCH is not set.')
 
     # Required when setting Python version in conda
     PYTHON_VERSION_NO_DOT = PYTHON_VERSION.replace('.', '')
@@ -160,9 +175,10 @@ def python_arch():
 
 # ------------------------ MINICONDA INTEGRATION ---------------------------- #
 
-def url_for_platform_version(platform, py_version, arch):
+def url_for_platform_version(platform, arch):
+    # Always install Miniconda3
     version = 'latest'
-    base_url = 'http://repo.continuum.io/miniconda/Miniconda'
+    base_url = 'http://repo.continuum.io/miniconda/Miniconda3'
     platform_str = {'Linux': 'Linux',
                     'Darwin': 'MacOSX',
                     'Windows': 'Windows'}
@@ -172,28 +188,16 @@ def url_for_platform_version(platform, py_version, arch):
            'Darwin': '.sh',
            'Windows': '.exe'}
 
-    # Python 3 versions (we won't support previous to 2.7)
-    if py_version in SUPPORTED_PY_VERS[1:]:
-        base_url += '3'
-    elif py_version != '2.7':
-        raise ValueError(SUPPORTED_ERR_MSG)
     return '-'.join([base_url, version,
                      platform_str[platform],
                      arch_str[arch]]) + ext[platform]
 
 
 def appveyor_miniconda_dir():
-    # We don't actually need the Miniconda directory to match the Python version
-    # that we are building but we do merely for consistency.
-    # Python 3 versions (we won't support previous to 2.7)
-    if PYTHON_VERSION in SUPPORTED_PY_VERS[1:]:
-        conda_dir = r'C:\Miniconda3'
-    elif PYTHON_VERSION == '2.7':
-        conda_dir = r'C:\Miniconda'
-    else:
-        raise ValueError(SUPPORTED_ERR_MSG)
+    # We always prefer the Miniconda3 version
+    conda_dir = r'C:\Miniconda3'
 
-    if python_arch() == 'x64':
+    if ARCH == 'x64':
         conda_dir += '-x64'
 
     return conda_dir
@@ -234,14 +238,14 @@ def miniconda_dir():
         # Jenkins persists miniconda installs between builds, but we want a
         # unique miniconda env for each executor. Therefore, on jenkins
         # the miniconda paths look like
-        # {MINICONDA_DIR}/{EXECUTOR_NUMBER}/{PYTHON_ARCH}
+        # {MINICONDA_DIR}/{EXECUTOR_NUMBER}/{ARCH}
         if not os.path.isdir(path):
             os.mkdir(path)
         exec_no = os.environ['EXECUTOR_NUMBER']
         j_path = os.path.join(path, exec_no)
         if not os.path.isdir(j_path):
             os.mkdir(j_path)
-        path = os.path.join(j_path, python_arch())
+        path = os.path.join(j_path, ARCH)
     return path
 
 
@@ -273,14 +277,13 @@ def install_miniconda(path_to_installer, path_to_install):
         execute([path_to_installer, '-b', '-p', path_to_install])
 
 
-def setup_miniconda(python_version, installation_path, binstar_user=None):
+def setup_miniconda(installation_path, binstar_user=None):
     conda_cmd = conda(installation_path)
     if os.path.exists(conda_cmd):
         print('conda is already setup at {}'.format(installation_path))
     else:
         print('No existing conda install detected at {}'.format(installation_path))
-        url = url_for_platform_version(host_platform(), python_version,
-                                       python_arch())
+        url = url_for_platform_version(host_platform(), ARCH)
         print('Setting up miniconda from URL {}'.format(url))
         print("(Installing to '{}')".format(installation_path))
         acquire_miniconda(url, temp_installer_path())
@@ -316,8 +319,7 @@ def get_conda_build_path(recipe_dir):
 
 
 def windows_setup_compiler():
-    arch = python_arch()
-    if PYTHON_VERSION in VS9_PY_VERS and arch == 'x64':
+    if PYTHON_VERSION in VS9_PY_VERS and ARCH == 'x64':
         VS2008_AMD64_PATH = os.path.join(VS2008_BIN_PATH, 'amd64')
         if not os.path.exists(VS2008_AMD64_PATH):
             os.makedirs(VS2008_AMD64_PATH)
@@ -327,7 +329,7 @@ def windows_setup_compiler():
                   VCVARS64_PATH, VCVARSAMD64_PATH))
         shutil.copyfile(VCVARS64_PATH, VCVARSAMD64_PATH)
     # Python 3.3 or 3.4
-    elif PYTHON_VERSION in VS10_PY_VERS and arch == 'x64':
+    elif PYTHON_VERSION in VS10_PY_VERS and ARCH == 'x64':
         VS2010_AMD64_PATH = os.path.join(VS2010_BIN_PATH, 'amd64')
         if not os.path.exists(VS2010_AMD64_PATH):
             os.makedirs(VS2010_AMD64_PATH)
@@ -734,7 +736,7 @@ def miniconda_dir_cmd(_):
 def setup_cmd(_):
     set_globals_from_environ()
     mc = miniconda_dir()
-    setup_miniconda(PYTHON_VERSION, mc, binstar_user=BINSTAR_USER)
+    setup_miniconda(mc, binstar_user=BINSTAR_USER)
 
 
 def build_cmd(args):
