@@ -326,7 +326,8 @@ def windows_setup_compiler():
         VCVARS64_PATH = os.path.join(VS2008_BIN_PATH, 'vcvars64.bat')
         VCVARSAMD64_PATH = os.path.join(VS2008_AMD64_PATH, 'vcvarsamd64.bat')
         if not os.path.exists(VCVARS64_PATH):
-            print("Unable to find '{}' - skipping fix for VS2008 64-bit.")
+            print("Unable to find '{}' - skipping fix for VS2008 64-bit.".format(
+                VCVARS64_PATH))
         else:
             print("Copying '{}' to '{}' to fix VS2008 64-bit configuration.".format(
                       VCVARS64_PATH, VCVARSAMD64_PATH))
