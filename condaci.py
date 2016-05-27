@@ -217,7 +217,7 @@ def jenkins_windows_miniconda_dir():
 
 
 def temp_installer_path():
-    # we need a place to download the miniconda installer too. use a random
+    # we need a place to download the miniconda installer to. use a random
     # string for the filename to avoid collisions, but choose the dir based
     # on platform
     return ('C:\{}.exe'.format(RANDOM_UUID) if is_windows()
@@ -225,7 +225,7 @@ def temp_installer_path():
 
 
 def miniconda_dir():
-    # the directory where miniconda will be installed too/is
+    # the directory where miniconda will be installed to/is
     if is_on_appveyor():
         path = appveyor_miniconda_dir()
     elif is_on_travis():
