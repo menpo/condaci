@@ -606,7 +606,8 @@ is_on_jenkins = lambda: 'JENKINS_URL' in os.environ
 
 is_pr_from_travis = lambda: os.environ['TRAVIS_PULL_REQUEST'] != 'false'
 is_pr_from_appveyor = lambda: 'APPVEYOR_PULL_REQUEST_NUMBER' in os.environ
-is_pr_from_jenkins = lambda: 'ghprbSourceBranch' in os.environ
+# TODO: Remove when ghprb is fixed
+is_pr_from_jenkins = os.environ['JOB_NAME'].split('/')[0][-3:] == '-pr'
 
 branch_from_appveyor = lambda: os.environ['APPVEYOR_REPO_BRANCH']
 
