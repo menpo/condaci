@@ -47,8 +47,9 @@ def set_globals_from_environ(verbose=True):
         raise ValueError('FATAL: Unknown CI system.')
 
     PYTHON_VERSION = os.environ.get('PYTHON_VERSION')
-    if 'ARCH' in os.environ:
-        ARCH = os.environ.get('ARCH')
+    # ARCH or PLATFORM - PLATFORM on Appveyor
+    if 'ARCH' in os.environ or 'PLATFORM' in os.environ:
+        ARCH = os.environ.get('ARCH', os.environ.get('PLATFORM'))
         arch_origin = 'Environment'
     else:
         # If we weren't given the ARCH variable (as on Jenkins) then predict
