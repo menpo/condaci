@@ -183,6 +183,8 @@ def url_for_platform_version(platform, py_version, arch):
 
 
 def appveyor_miniconda_dir():
+    # We don't actually need the Miniconda directory to match the Python version
+    # that we are building but we do merely for consistency.
     # Python 3 versions (we won't support previous to 2.7)
     if PYTHON_VERSION in SUPPORTED_PY_VERS[1:]:
         conda_dir = r'C:\Miniconda3'
@@ -311,19 +313,6 @@ def get_conda_build_path(recipe_dir):
         raise ValueError('Unable to find recipe_dir')
 
 
-def conda_build_package_win(mc, path):
-    if 'BINSTAR_KEY' in os.environ:
-        print('found BINSTAR_KEY in environment on Windows - deleting to '
-              'stop vcvarsall from telling the world')
-        del os.environ['BINSTAR_KEY']
-    os.environ['PYTHON_ARCH'] = host_arch()[:2]
-    os.environ['PYTHON_VERSION'] = PYTHON_VERSION
-    print('PYTHON_ARCH={} PYTHON_VERSION={}'.format(os.environ['PYTHON_ARCH'],
-                                                    os.environ['PYTHON_VERSION']))
-    execute([conda(mc), 'build', '-q', path,
-             '--py={}'.format(PYTHON_VERSION_NO_DOT)])
-
-
 def windows_setup_compiler():
     arch = python_arch()
     if PYTHON_VERSION in VS9_PY_VERS and arch == '64bit':
@@ -370,14 +359,17 @@ def build_conda_package(mc, path, binstar_user=None):
     else:
         print('building a RC or tag release - no master channel added.')
 
-    if host_platform() == 'Windows':
+    if 'BINSTAR_KEY' in os.environ:
+        print('found BINSTAR_KEY in environment - deleting to '
+              'prevent from leaking.')
+    del os.environ['BINSTAR_KEY']
+
+    if is_windows():
         # Before building the package, we may need to edit the environment a bit
         # to handle the nightmare that is Visual Studio compilation
         windows_setup_compiler()
-        conda_build_package_win(mc, path)
-    else:
-        execute([conda(mc), 'build', '-q', path,
-                 '--py={}'.format(PYTHON_VERSION_NO_DOT)])
+    execute([conda(mc), 'build', '-q', path,
+             '--py={}'.format(PYTHON_VERSION_NO_DOT)])
 
 
 # ------------------------- VERSIONING INTEGRATION -------------------------- #
