@@ -10,10 +10,6 @@ import uuid
 import sys
 from pprint import pprint
 
-# on windows we have to download a small secondary script that configures
-# Python 3 64-bit extensions. Here we define the URL and the local path that
-# we will use for this script.
-import zipfile
 
 VS9_PY_VERS = ['2.7']
 VS10_PY_VERS = ['3.3', '3.4']
@@ -130,14 +126,6 @@ def execute_sequence(*cmds, **kwargs):
     verbose = kwargs.get('verbose', True)
     for cmd in cmds:
         execute(cmd, verbose)
-
-
-def extract_zip(zip_path, dest_dir):
-    r"""
-    Extract a zip file to a destination
-    """
-    with zipfile.PyZipFile(str(zip_path)) as z:
-        z.extractall(path=str(dest_dir))
 
 
 def download_file(url, path_to_download):
