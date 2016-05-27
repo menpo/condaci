@@ -371,7 +371,7 @@ def build_conda_package(mc, path, binstar_user=None):
     if 'BINSTAR_KEY' in os.environ:
         print('found BINSTAR_KEY in environment - deleting to '
               'prevent from leaking.')
-    del os.environ['BINSTAR_KEY']
+        del os.environ['BINSTAR_KEY']
 
     if is_windows():
         # Before building the package, we may need to edit the environment a bit
