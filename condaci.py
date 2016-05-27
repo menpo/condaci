@@ -10,10 +10,6 @@ import uuid
 import sys
 from pprint import pprint
 
-# on windows we have to download a small secondary script that configures
-# Python 3 64-bit extensions. Here we define the URL and the local path that
-# we will use for this script.
-import zipfile
 
 VS9_PY_VERS = ['2.7']
 VS10_PY_VERS = ['3.3', '3.4']
@@ -41,18 +37,32 @@ PYTHON_VERSION = None
 PYTHON_VERSION_NO_DOT = None
 BINSTAR_USER = None
 BINSTAR_KEY = None
+ARCH = None
 
 
 def set_globals_from_environ(verbose=True):
-    global PYTHON_VERSION, BINSTAR_KEY, BINSTAR_USER, PYTHON_VERSION_NO_DOT
+    global PYTHON_VERSION, BINSTAR_KEY, BINSTAR_USER, PYTHON_VERSION_NO_DOT, ARCH
+
+    if not (is_on_appveyor() or is_on_travis() or is_on_jenkins()):
+        raise ValueError('FATAL: Unknown CI system.')
 
     PYTHON_VERSION = os.environ.get('PYTHON_VERSION')
+    # ARCH or PLATFORM - PLATFORM on Appveyor
+    if 'ARCH' in os.environ or 'PLATFORM' in os.environ:
+        ARCH = os.environ.get('ARCH', os.environ.get('PLATFORM'))
+        arch_origin = 'Environment'
+    else:
+        # If we weren't given the ARCH variable (as on Jenkins) then predict
+        # the architecture from the Python version (x86 or x64)
+        ARCH = python_arch()
+        arch_origin = 'Python'
     BINSTAR_USER = os.environ.get('BINSTAR_USER')
     BINSTAR_KEY = os.environ.get('BINSTAR_KEY')
 
     if verbose:
         print('Environment variables extracted:')
         print('  PYTHON_VERSION: {}'.format(PYTHON_VERSION))
+        print('  ARCH:           {} - ({})'.format(ARCH, arch_origin))
         print('  BINSTAR_USER:   {}'.format(BINSTAR_USER))
         print('  BINSTAR_KEY:    {}'.format('*****' if BINSTAR_KEY is not None
                                             else '-'))
@@ -62,6 +72,8 @@ def set_globals_from_environ(verbose=True):
     if PYTHON_VERSION not in SUPPORTED_PY_VERS:
         raise ValueError("FATAL: PYTHON_VERSION '{}' is invalid - must be "
                          "one of {}".format(PYTHON_VERSION, SUPPORTED_PY_VERS))
+    if ARCH is None:
+        raise ValueError('FATAL: ARCH is not set.')
 
     # Required when setting Python version in conda
     PYTHON_VERSION_NO_DOT = PYTHON_VERSION.replace('.', '')
@@ -132,14 +144,6 @@ def execute_sequence(*cmds, **kwargs):
         execute(cmd, verbose)
 
 
-def extract_zip(zip_path, dest_dir):
-    r"""
-    Extract a zip file to a destination
-    """
-    with zipfile.PyZipFile(str(zip_path)) as z:
-        z.extractall(path=str(dest_dir))
-
-
 def download_file(url, path_to_download):
     try:
         from urllib2 import urlopen
@@ -161,96 +165,98 @@ def host_platform():
     return stdplatform.system()
 
 
-def host_arch():
-    arch = stdplatform.architecture()[0]
-    # need to be a little more sneaky to check the platform on Windows:
-    # http://stackoverflow.com/questions/2208828/detect-64bit-os-windows-in-python
-    if host_platform() == 'Windows':
-        if 'APPVEYOR' in os.environ:
-            av_platform = os.environ['PLATFORM']
-            if av_platform == 'x86':
-                arch = '32bit'
-            elif av_platform == 'x64':
-                arch = '64bit'
-            else:
-                print('Was unable to interpret the platform "{}"'.format(
-                    av_platform))
-    return arch
+def is_windows():
+    return host_platform() == 'Windows'
+
+
+def python_arch():
+    # We care about the Python architecture, not the OS.
+    return 'x64' if sys.maxsize > 2**32 else 'x86'
 
 
 # ------------------------ MINICONDA INTEGRATION ---------------------------- #
 
-def url_for_platform_version(platform, py_version, arch):
+def url_for_platform_version(platform, arch):
+    # Always install Miniconda3
     version = 'latest'
-    base_url = 'http://repo.continuum.io/miniconda/Miniconda'
+    base_url = 'http://repo.continuum.io/miniconda/Miniconda3'
     platform_str = {'Linux': 'Linux',
                     'Darwin': 'MacOSX',
                     'Windows': 'Windows'}
-    arch_str = {'64bit': 'x86_64',
-                '32bit': 'x86'}
+    arch_str = {'x64': 'x86_64',
+                'x86': 'x86'}
     ext = {'Linux': '.sh',
            'Darwin': '.sh',
            'Windows': '.exe'}
 
-    # Python 3 versions (we won't support previous to 2.7)
-    if py_version in SUPPORTED_PY_VERS[1:]:
-        base_url += '3'
-    elif py_version != '2.7':
-        raise ValueError(SUPPORTED_ERR_MSG)
     return '-'.join([base_url, version,
                      platform_str[platform],
                      arch_str[arch]]) + ext[platform]
 
 
 def appveyor_miniconda_dir():
-    # Python 3 versions (we won't support previous to 2.7)
-    if PYTHON_VERSION in SUPPORTED_PY_VERS[1:]:
-        conda_dir = r'C:\Miniconda3'
-    elif PYTHON_VERSION == '2.7':
-        conda_dir = r'C:\Miniconda'
-    else:
-        raise ValueError(SUPPORTED_ERR_MSG)
+    # We always prefer the Miniconda3 version
+    conda_dir = r'C:\Miniconda3'
 
-    if host_arch() == '64bit':
+    if ARCH == 'x64':
         conda_dir += '-x64'
 
     return conda_dir
 
 
+def travis_miniconda_dir():
+    return p.expanduser('~/miniconda')
+
+
+def jenkins_unix_miniconda_dir():
+    return p.expanduser('~/miniconda')
+
+
+def jenkins_windows_miniconda_dir():
+    return r'C:\miniconda'
+
+
 def temp_installer_path():
-    # we need a place to download the miniconda installer too. use a random
+    # we need a place to download the miniconda installer to. use a random
     # string for the filename to avoid collisions, but choose the dir based
     # on platform
-    return ('C:\{}.exe'.format(RANDOM_UUID) if host_platform() == 'Windows'
+    return ('C:\{}.exe'.format(RANDOM_UUID) if is_windows()
             else p.expanduser('~/{}.sh'.format(RANDOM_UUID)))
 
 
 def miniconda_dir():
-    # the directory where miniconda will be installed too/is
-    if host_platform() == 'Windows':
+    # the directory where miniconda will be installed to/is
+    if is_on_appveyor():
         path = appveyor_miniconda_dir()
-    else:  # Unix
-        path = p.expanduser('~/miniconda')
-    if is_on_jenkins():
-        # jenkins persists miniconda installs between builds, but we want a
-        # unique miniconda env for each executor
+    elif is_on_travis():
+        path = travis_miniconda_dir()
+    elif is_on_jenkins():
+        if is_windows():
+            path = jenkins_windows_miniconda_dir()
+        else:
+            path = jenkins_unix_miniconda_dir()
+
+        # Jenkins persists miniconda installs between builds, but we want a
+        # unique miniconda env for each executor. Therefore, on jenkins
+        # the miniconda paths look like
+        # {MINICONDA_DIR}/{EXECUTOR_NUMBER}/{ARCH}
         if not os.path.isdir(path):
-                os.mkdir(path)
+            os.mkdir(path)
         exec_no = os.environ['EXECUTOR_NUMBER']
         j_path = os.path.join(path, exec_no)
         if not os.path.isdir(j_path):
             os.mkdir(j_path)
-        path = os.path.join(j_path, PYTHON_VERSION)
+        path = os.path.join(j_path, ARCH)
     return path
 
 
 # the script directory inside a miniconda install varies based on platform
 def miniconda_script_dir_name():
-    return 'Scripts' if host_platform() == 'Windows' else 'bin'
+    return 'Scripts' if is_windows() else 'bin'
 
 
 # handles to binaries from a miniconda install
-exec_ext = '.exe' if host_platform() == 'Windows' else ''
+exec_ext = '.exe' if is_windows() else ''
 miniconda_script_dir = lambda mc: p.join(mc, miniconda_script_dir_name())
 conda = lambda mc: p.join(miniconda_script_dir(mc), 'conda' + exec_ext)
 binstar = lambda mc: p.join(miniconda_script_dir(mc), 'anaconda' + exec_ext)
@@ -263,21 +269,22 @@ def acquire_miniconda(url, path_to_download):
 
 def install_miniconda(path_to_installer, path_to_install):
     print('Installing miniconda to {}'.format(path_to_install))
-    if host_platform() == 'Windows':
-        execute([path_to_installer, '/S', '/D={}'.format(path_to_install)])
+    if is_windows():
+        execute([path_to_installer, '/InstallationType=AllUsers',
+                 '/AddToPath=0', '/RegisterPath=1', '/NoRegistry=1',
+                 '/S', '/D={}'.format(path_to_install)])
     else:
         execute(['chmod', '+x', path_to_installer])
         execute([path_to_installer, '-b', '-p', path_to_install])
 
 
-def setup_miniconda(python_version, installation_path, binstar_user=None):
+def setup_miniconda(installation_path, binstar_user=None):
     conda_cmd = conda(installation_path)
     if os.path.exists(conda_cmd):
         print('conda is already setup at {}'.format(installation_path))
     else:
         print('No existing conda install detected at {}'.format(installation_path))
-        url = url_for_platform_version(host_platform(), python_version,
-                                       host_arch())
+        url = url_for_platform_version(host_platform(), ARCH)
         print('Setting up miniconda from URL {}'.format(url))
         print("(Installing to '{}')".format(installation_path))
         acquire_miniconda(url, temp_installer_path())
@@ -312,32 +319,22 @@ def get_conda_build_path(recipe_dir):
         raise ValueError('Unable to find recipe_dir')
 
 
-def conda_build_package_win(mc, path):
-    if 'BINSTAR_KEY' in os.environ:
-        print('found BINSTAR_KEY in environment on Windows - deleting to '
-              'stop vcvarsall from telling the world')
-        del os.environ['BINSTAR_KEY']
-    os.environ['PYTHON_ARCH'] = host_arch()[:2]
-    os.environ['PYTHON_VERSION'] = PYTHON_VERSION
-    print('PYTHON_ARCH={} PYTHON_VERSION={}'.format(os.environ['PYTHON_ARCH'],
-                                                    os.environ['PYTHON_VERSION']))
-    execute([conda(mc), 'build', '-q', path,
-             '--py={}'.format(PYTHON_VERSION_NO_DOT)])
-
-
 def windows_setup_compiler():
-    arch = host_arch()
-    if PYTHON_VERSION in VS9_PY_VERS and arch == '64bit':
+    if PYTHON_VERSION in VS9_PY_VERS and ARCH == 'x64':
         VS2008_AMD64_PATH = os.path.join(VS2008_BIN_PATH, 'amd64')
         if not os.path.exists(VS2008_AMD64_PATH):
             os.makedirs(VS2008_AMD64_PATH)
         VCVARS64_PATH = os.path.join(VS2008_BIN_PATH, 'vcvars64.bat')
         VCVARSAMD64_PATH = os.path.join(VS2008_AMD64_PATH, 'vcvarsamd64.bat')
-        print("Copying '{}' to '{}' to fix VS2008 64-bit configuration.".format(
-                  VCVARS64_PATH, VCVARSAMD64_PATH))
-        shutil.copyfile(VCVARS64_PATH, VCVARSAMD64_PATH)
+        if not os.path.exists(VCVARS64_PATH):
+            print("Unable to find '{}' - skipping fix for VS2008 64-bit.".format(
+                VCVARS64_PATH))
+        else:
+            print("Copying '{}' to '{}' to fix VS2008 64-bit configuration.".format(
+                      VCVARS64_PATH, VCVARSAMD64_PATH))
+            shutil.copyfile(VCVARS64_PATH, VCVARSAMD64_PATH)
     # Python 3.3 or 3.4
-    elif PYTHON_VERSION in VS10_PY_VERS and arch == '64bit':
+    elif PYTHON_VERSION in VS10_PY_VERS and ARCH == 'x64':
         VS2010_AMD64_PATH = os.path.join(VS2010_BIN_PATH, 'amd64')
         if not os.path.exists(VS2010_AMD64_PATH):
             os.makedirs(VS2010_AMD64_PATH)
@@ -371,14 +368,17 @@ def build_conda_package(mc, path, binstar_user=None):
     else:
         print('building a RC or tag release - no master channel added.')
 
-    if host_platform() == 'Windows':
+    if 'BINSTAR_KEY' in os.environ:
+        print('found BINSTAR_KEY in environment - deleting to '
+              'prevent from leaking.')
+    del os.environ['BINSTAR_KEY']
+
+    if is_windows():
         # Before building the package, we may need to edit the environment a bit
         # to handle the nightmare that is Visual Studio compilation
         windows_setup_compiler()
-        conda_build_package_win(mc, path)
-    else:
-        execute([conda(mc), 'build', '-q', path,
-                 '--py={}'.format(PYTHON_VERSION_NO_DOT)])
+    execute([conda(mc), 'build', '-q', path,
+             '--py={}'.format(PYTHON_VERSION_NO_DOT)])
 
 
 # ------------------------- VERSIONING INTEGRATION -------------------------- #
@@ -615,7 +615,8 @@ is_on_jenkins = lambda: 'JENKINS_URL' in os.environ
 
 is_pr_from_travis = lambda: os.environ['TRAVIS_PULL_REQUEST'] != 'false'
 is_pr_from_appveyor = lambda: 'APPVEYOR_PULL_REQUEST_NUMBER' in os.environ
-is_pr_from_jenkins = lambda: 'ghprbSourceBranch' in os.environ
+# TODO: Remove when ghprb is fixed
+is_pr_from_jenkins = lambda: os.environ['JOB_NAME'].split('/')[0][-3:] == '-pr'
 
 branch_from_appveyor = lambda: os.environ['APPVEYOR_REPO_BRANCH']
 
@@ -698,7 +699,7 @@ def binstar_channel_from_ci(path):
 
 # pypirc_path = p.join(p.expanduser('~'), '.pypirc')
 # pypi_upload_allowed = (host_platform() == 'Linux' and
-#                        host_arch() == '64bit' and
+#                        host_arch() == 'x64' and
 #                        sys.version_info.major == 2)
 #
 # pypi_template = """[distutils]
@@ -740,7 +741,7 @@ def miniconda_dir_cmd(_):
 def setup_cmd(_):
     set_globals_from_environ()
     mc = miniconda_dir()
-    setup_miniconda(PYTHON_VERSION, mc, binstar_user=BINSTAR_USER)
+    setup_miniconda(mc, binstar_user=BINSTAR_USER)
 
 
 def build_cmd(args):
