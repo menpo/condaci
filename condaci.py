@@ -149,21 +149,13 @@ def host_platform():
     return stdplatform.system()
 
 
-def host_arch():
-    arch = stdplatform.architecture()[0]
-    # need to be a little more sneaky to check the platform on Windows:
-    # http://stackoverflow.com/questions/2208828/detect-64bit-os-windows-in-python
-    if host_platform() == 'Windows':
-        if 'APPVEYOR' in os.environ:
-            av_platform = os.environ['PLATFORM']
-            if av_platform == 'x86':
-                arch = '32bit'
-            elif av_platform == 'x64':
-                arch = '64bit'
-            else:
-                print('Was unable to interpret the platform "{}"'.format(
-                    av_platform))
-    return arch
+def is_windows():
+    return host_platform() == 'Windows'
+
+
+def python_arch():
+    # We care about the Python architecture, not the OS.
+    return 'x64' if sys.maxsize > 2**32 else 'x86'
 
 
 # ------------------------ MINICONDA INTEGRATION ---------------------------- #
@@ -199,46 +191,65 @@ def appveyor_miniconda_dir():
     else:
         raise ValueError(SUPPORTED_ERR_MSG)
 
-    if host_arch() == '64bit':
+    if python_arch() == '64bit':
         conda_dir += '-x64'
 
     return conda_dir
+
+
+def travis_miniconda_dir():
+    return p.expanduser('~/miniconda')
+
+
+def jenkins_unix_miniconda_dir():
+    return p.expanduser('~/miniconda')
+
+
+def jenkins_windows_miniconda_dir():
+    return r'C:\miniconda'
 
 
 def temp_installer_path():
     # we need a place to download the miniconda installer too. use a random
     # string for the filename to avoid collisions, but choose the dir based
     # on platform
-    return ('C:\{}.exe'.format(RANDOM_UUID) if host_platform() == 'Windows'
+    return ('C:\{}.exe'.format(RANDOM_UUID) if is_windows()
             else p.expanduser('~/{}.sh'.format(RANDOM_UUID)))
 
 
 def miniconda_dir():
     # the directory where miniconda will be installed too/is
-    if host_platform() == 'Windows':
+    if is_on_appveyor():
         path = appveyor_miniconda_dir()
-    else:  # Unix
-        path = p.expanduser('~/miniconda')
-    if is_on_jenkins():
-        # jenkins persists miniconda installs between builds, but we want a
-        # unique miniconda env for each executor
+    elif is_on_travis():
+        path = travis_miniconda_dir()
+    elif is_on_jenkins():
+        if is_windows():
+            path = jenkins_windows_miniconda_dir()
+        else:
+            path = jenkins_unix_miniconda_dir()
+
+        # Jenkins persists miniconda installs between builds, but we want a
+        # unique miniconda env for each executor. Therefore, on jenkins
+        # the miniconda paths look like
+        # {MINICONDA_DIR}/{EXECUTOR_NUMBER}/{PYTHON_ARCH}
         if not os.path.isdir(path):
-                os.mkdir(path)
+            os.mkdir(path)
         exec_no = os.environ['EXECUTOR_NUMBER']
         j_path = os.path.join(path, exec_no)
         if not os.path.isdir(j_path):
             os.mkdir(j_path)
-        path = os.path.join(j_path, PYTHON_VERSION)
+        path = os.path.join(j_path, python_arch())
     return path
 
 
 # the script directory inside a miniconda install varies based on platform
 def miniconda_script_dir_name():
-    return 'Scripts' if host_platform() == 'Windows' else 'bin'
+    return 'Scripts' if is_windows() else 'bin'
 
 
 # handles to binaries from a miniconda install
-exec_ext = '.exe' if host_platform() == 'Windows' else ''
+exec_ext = '.exe' if is_windows() else ''
 miniconda_script_dir = lambda mc: p.join(mc, miniconda_script_dir_name())
 conda = lambda mc: p.join(miniconda_script_dir(mc), 'conda' + exec_ext)
 binstar = lambda mc: p.join(miniconda_script_dir(mc), 'anaconda' + exec_ext)
@@ -251,7 +262,7 @@ def acquire_miniconda(url, path_to_download):
 
 def install_miniconda(path_to_installer, path_to_install):
     print('Installing miniconda to {}'.format(path_to_install))
-    if host_platform() == 'Windows':
+    if is_windows():
         execute([path_to_installer, '/S', '/D={}'.format(path_to_install)])
     else:
         execute(['chmod', '+x', path_to_installer])
@@ -265,7 +276,7 @@ def setup_miniconda(python_version, installation_path, binstar_user=None):
     else:
         print('No existing conda install detected at {}'.format(installation_path))
         url = url_for_platform_version(host_platform(), python_version,
-                                       host_arch())
+                                       python_arch())
         print('Setting up miniconda from URL {}'.format(url))
         print("(Installing to '{}')".format(installation_path))
         acquire_miniconda(url, temp_installer_path())
@@ -314,7 +325,7 @@ def conda_build_package_win(mc, path):
 
 
 def windows_setup_compiler():
-    arch = host_arch()
+    arch = python_arch()
     if PYTHON_VERSION in VS9_PY_VERS and arch == '64bit':
         VS2008_AMD64_PATH = os.path.join(VS2008_BIN_PATH, 'amd64')
         if not os.path.exists(VS2008_AMD64_PATH):
