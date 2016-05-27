@@ -166,8 +166,8 @@ def url_for_platform_version(platform, py_version, arch):
     platform_str = {'Linux': 'Linux',
                     'Darwin': 'MacOSX',
                     'Windows': 'Windows'}
-    arch_str = {'64bit': 'x86_64',
-                '32bit': 'x86'}
+    arch_str = {'x64': 'x86_64',
+                'x86': 'x86'}
     ext = {'Linux': '.sh',
            'Darwin': '.sh',
            'Windows': '.exe'}
@@ -193,7 +193,7 @@ def appveyor_miniconda_dir():
     else:
         raise ValueError(SUPPORTED_ERR_MSG)
 
-    if python_arch() == '64bit':
+    if python_arch() == 'x64':
         conda_dir += '-x64'
 
     return conda_dir
@@ -315,7 +315,7 @@ def get_conda_build_path(recipe_dir):
 
 def windows_setup_compiler():
     arch = python_arch()
-    if PYTHON_VERSION in VS9_PY_VERS and arch == '64bit':
+    if PYTHON_VERSION in VS9_PY_VERS and arch == 'x64':
         VS2008_AMD64_PATH = os.path.join(VS2008_BIN_PATH, 'amd64')
         if not os.path.exists(VS2008_AMD64_PATH):
             os.makedirs(VS2008_AMD64_PATH)
@@ -325,7 +325,7 @@ def windows_setup_compiler():
                   VCVARS64_PATH, VCVARSAMD64_PATH))
         shutil.copyfile(VCVARS64_PATH, VCVARSAMD64_PATH)
     # Python 3.3 or 3.4
-    elif PYTHON_VERSION in VS10_PY_VERS and arch == '64bit':
+    elif PYTHON_VERSION in VS10_PY_VERS and arch == 'x64':
         VS2010_AMD64_PATH = os.path.join(VS2010_BIN_PATH, 'amd64')
         if not os.path.exists(VS2010_AMD64_PATH):
             os.makedirs(VS2010_AMD64_PATH)
@@ -690,7 +690,7 @@ def binstar_channel_from_ci(path):
 
 # pypirc_path = p.join(p.expanduser('~'), '.pypirc')
 # pypi_upload_allowed = (host_platform() == 'Linux' and
-#                        host_arch() == '64bit' and
+#                        host_arch() == 'x64' and
 #                        sys.version_info.major == 2)
 #
 # pypi_template = """[distutils]
