@@ -325,9 +325,12 @@ def windows_setup_compiler():
             os.makedirs(VS2008_AMD64_PATH)
         VCVARS64_PATH = os.path.join(VS2008_BIN_PATH, 'vcvars64.bat')
         VCVARSAMD64_PATH = os.path.join(VS2008_AMD64_PATH, 'vcvarsamd64.bat')
-        print("Copying '{}' to '{}' to fix VS2008 64-bit configuration.".format(
-                  VCVARS64_PATH, VCVARSAMD64_PATH))
-        shutil.copyfile(VCVARS64_PATH, VCVARSAMD64_PATH)
+        if not os.path.exists(VCVARS64_PATH):
+            print("Unable to find '{}' - skipping fix for VS2008 64-bit.")
+        else:
+            print("Copying '{}' to '{}' to fix VS2008 64-bit configuration.".format(
+                      VCVARS64_PATH, VCVARSAMD64_PATH))
+            shutil.copyfile(VCVARS64_PATH, VCVARSAMD64_PATH)
     # Python 3.3 or 3.4
     elif PYTHON_VERSION in VS10_PY_VERS and ARCH == 'x64':
         VS2010_AMD64_PATH = os.path.join(VS2010_BIN_PATH, 'amd64')
