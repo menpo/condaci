@@ -408,14 +408,8 @@ def versions_from_versioneer():
 
 
 def version_from_meta_yaml(path):
-    meta_yaml_path = os.path.join(path, 'meta.yaml')
-    with open(meta_yaml_path, 'rt') as f:
-        s = f.read()
-    v = s.split('version:', 1)[1].split('\n', 1)[0].strip().strip("'").strip('"')
-    if '{{' in v:
-        raise ValueError('Trying to establish version from meta.yaml'
-                         ' and it seems to be dynamic: {}'.format(v))
-    return v
+    from conda_build.metadata import MetaData
+    return MetaData(path).version()
 
 
 def get_version(path):
