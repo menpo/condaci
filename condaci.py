@@ -348,13 +348,14 @@ def windows_setup_compiler():
 
 def build_conda_package(mc, path, binstar_user=None):
     print('Building package at path {}'.format(path))
+    print('Setting CONDA_PY environment variable to {}'.format(
+        PYTHON_VERSION_NO_DOT))
+    os.environ['CONDA_PY'] = PYTHON_VERSION_NO_DOT
+
     v = get_version(path)
     print('Detected version: {}'.format(v))
     print('Setting CONDACI_VERSION environment variable to {}'.format(v))
     os.environ['CONDACI_VERSION'] = v
-    print('Setting CONDA_PY environment variable to {}'.format(
-        PYTHON_VERSION_NO_DOT))
-    os.environ['CONDA_PY'] = PYTHON_VERSION_NO_DOT
 
     # we want to add the master channel when doing dev builds to source our
     # other dev dependencies
