@@ -300,11 +300,17 @@ def setup_miniconda(python_version, installation_path, binstar_user=None):
 # ------------------------ CONDA BUILD INTEGRATION -------------------------- #
 
 def get_conda_build_path(recipe_dir):
-    from conda_build.render import render_recipe
+    from conda_build.metadata import MetaData
     from conda_build.build import bldpkg_path
-    with suppress_stdout():
-        m, _ = render_recipe(recipe_dir, no_download_source=False)
-    return bldpkg_path(m).strip()
+    m = MetaData(recipe_dir)
+    try:
+        # conda-build >= 2
+        from conda_build.config import Config
+        config = Config()
+        fname = bldpkg_path(m, config)
+    except TypeError:
+        fname = bldpkg_path(m)
+    return fname.strip()
 
 
 def conda_build_package_win(mc, path):
