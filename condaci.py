@@ -179,7 +179,7 @@ def python_arch():
 def url_for_platform_version(platform, arch):
     # Always install Miniconda3
     version = 'latest'
-    base_url = 'http://repo.continuum.io/miniconda/Miniconda3'
+    base_url = 'https://repo.continuum.io/miniconda/Miniconda3'
     platform_str = {'Linux': 'Linux',
                     'Darwin': 'MacOSX',
                     'Windows': 'Windows'}
