@@ -191,7 +191,7 @@ def python_arch():
 def url_for_platform_version(platform, arch):
     # Always install Miniconda3
     version = 'latest'
-    base_url = 'http://repo.continuum.io/miniconda/Miniconda3'
+    base_url = 'https://repo.continuum.io/miniconda/Miniconda3'
     platform_str = {'Linux': 'Linux',
                     'Darwin': 'MacOSX',
                     'Windows': 'Windows'}
@@ -327,7 +327,14 @@ def get_conda_build_path(recipe_dir):
         from conda_build.metadata import MetaData
         from conda_build.build import bldpkg_path
         m = MetaData(recipe_dir)
-        return bldpkg_path(m).strip()
+        try:
+            # conda-build >= 2
+            from conda_build.config import Config
+            config = Config()
+            fname = bldpkg_path(m, config)
+        except TypeError:
+            fname = bldpkg_path(m)
+        return fname.strip()
     except:
         raise ValueError('Unable to find recipe_dir')
 
