@@ -796,13 +796,12 @@ def upload_to_pypi_if_appropriate(mc, path, username, password,
     
     v = get_version(path)
 
-    # if is_rc_tag(v):
-    if True:
+    if is_rc_tag(v):
         print('RC tag: uploading to test PyPI repository')
         repo = 'pypitest'
-    # elif is_release_tag(v):
-    #     print('Release tag: uploading to main PyPI repository')
-    #     repo = 'pypi'
+    elif is_release_tag(v):
+        print('Release tag: uploading to main PyPI repository')
+        repo = 'pypi'
     else:
         print('Not release tag or RC tag - no PyPI upload')
         return  
