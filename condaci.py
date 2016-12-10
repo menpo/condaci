@@ -785,7 +785,7 @@ def upload_to_pypi_if_appropriate(mc, path, username, password,
         print('No PyPI test username provided')
     if test_password is None:
         print('No PyPI test password provided')
-    if None in {username, password test_username, test_password}:
+    if None in {username, password, test_username, test_password}:
         print('-> Unable to upload to PyPI')
         return
     
