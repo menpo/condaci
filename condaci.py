@@ -40,16 +40,18 @@ BINSTAR_USER = None
 BINSTAR_KEY = None
 PYPI_USER = None
 PYPI_PASSWORD = None
+PYPI_TEST_USER = None
+PYPI_TEST_PASSWORD = None
 ARCH = None
 
 # Env variables that we need to be careful to purge (so they aren't
 # divulged by accident)
-SECRET_ENVS = ['BINSTAR_KEY', 'PYPI_PASSWORD']
+SECRET_ENVS = ['BINSTAR_KEY', 'PYPI_PASSWORD', 'PYPI_TEST_PASSWORD']
 
 
 def set_globals_from_environ(verbose=True):
     global PYTHON_VERSION, BINSTAR_KEY, BINSTAR_USER, PYTHON_VERSION_NO_DOT
-    global PYPI_USER, PYPI_PASSWORD, ARCH
+    global PYPI_USER, PYPI_PASSWORD, PYPI_TEST_USER, PYPI_TEST_PASSWORD, ARCH
 
     if not (is_on_appveyor() or is_on_travis() or is_on_jenkins()):
         raise ValueError('FATAL: Unknown CI system.')
@@ -68,17 +70,22 @@ def set_globals_from_environ(verbose=True):
     BINSTAR_KEY = os.environ.get('BINSTAR_KEY')
     PYPI_USER = os.environ.get('PYPI_USER')
     PYPI_PASSWORD = os.environ.get('PYPI_PASSWORD')
+    PYPI_TEST_USER = os.environ.get('PYPI_TEST_USER')
+    PYPI_TEST_PASSWORD = os.environ.get('PYPI_TEST_PASSWORD')
 
     if verbose:
         print('Environment variables extracted:')
-        print('  PYTHON_VERSION: {}'.format(PYTHON_VERSION))
-        print('  ARCH:           {} - ({})'.format(ARCH, arch_origin))
-        print('  BINSTAR_USER:   {}'.format(BINSTAR_USER))
-        print('  BINSTAR_KEY:    {}'.format('*****' if BINSTAR_KEY is not None
-                                            else '-'))
-        print('  PYPI_USER:      {}'.format(PYPI_USER))
-        print('  PYPI_PASSWORD:  {}'.format('*****' if PYPI_PASSWORD is not None
-                                            else '-'))
+        print('  PYTHON_VERSION:    {}'.format(PYTHON_VERSION))
+        print('  ARCH:              {} - ({})'.format(ARCH, arch_origin))
+        print('  BINSTAR_USER:      {}'.format(BINSTAR_USER))
+        print('  BINSTAR_KEY:       {}'.format('*****' if BINSTAR_KEY
+                                               is not None else '-'))
+        print('  PYPI_USER:         {}'.format(PYPI_USER))
+        print('  PYPI_PASSWORD:     {}'.format('*****' if PYPI_PASSWORD
+                                               is not None else '-'))
+        print('  PYPI_TEST_USER:    {}'.format(PYPI_TEST_USER))
+        print('  PYPI_TEST_PASSWORD:{}'.format('*****' if PYPI_TEST_PASSWORD
+                                               is not None else '-'))
 
     if PYTHON_VERSION is None:
         raise ValueError('FATAL: PYTHON_VERSION is not set.')
@@ -746,32 +753,39 @@ pypi_sdist_upload_allowed = lambda: (host_platform() == 'Linux' and
                                      PYPI_SDIST_UPLOAD_PYTHON_VERSION)
 
 pypi_template = """[distutils]
-index-servers=
+index-servers =
     pypi
     pypitest
 
-[pypitest]
-repository = https://testpypi.python.org/pypi
-username = {username}
-password = {password}
-
 [pypi]
-repository = https://pypi.python.org/pypi
-username = {username}
-password = {password}"""
+repository: https://pypi.python.org/pypi
+username: {username}
+password: {password}
+
+[pypitest]
+repository: https://testpypi.python.org/pypi
+username: {test_username}
+password: {test_password}"""
 
 
-def pypi_setup_dotfile(username, password):
+def pypi_setup_dotfile(username, password, test_username, test_password):
     with open(pypirc_path(), 'wt') as f:
-        f.write(pypi_template.format(username=username, password=password))
+        f.write(pypi_template.format(username=username, password=password,
+                                     test_username=test_username,
+                                     test_password=test_password))
 
 
-def upload_to_pypi_if_appropriate(mc, path, username, password):
+def upload_to_pypi_if_appropriate(mc, path, username, password,
+                                  test_username, test_password):
     if username is None:
         print('No PyPI username provided')
     if password is None:
         print('No PyPI password provided')
-    if username is None or password is None:
+    if test_username is None:
+        print('No PyPI test username provided')
+    if test_password is None:
+        print('No PyPI test password provided')
+    if None in {username, password test_username, test_password}:
         print('-> Unable to upload to PyPI')
         return
     
@@ -785,16 +799,16 @@ def upload_to_pypi_if_appropriate(mc, path, username, password):
     # if is_rc_tag(v):
     if True:
         print('RC tag: uploading to test PyPI repository')
-        repo = 'https://testpypi.python.org/pypi'
+        repo = 'pypitest'
     # elif is_release_tag(v):
     #     print('Release tag: uploading to main PyPI repository')
-    #     repo = 'https://pypi.python.org/pypi'
+    #     repo = 'pypi'
     else:
         print('Not release tag or RC tag - no PyPI upload')
         return  
 
     print('Setting up .pypirc file..')
-    pypi_setup_dotfile(username, password)
+    pypi_setup_dotfile(username, password, test_username, test_password)
 
     print('Finding last-used conda build work dir and build env')
     work_dir = unique_last_used_conda_build_work_dir(mc)
@@ -829,7 +843,8 @@ def build_cmd(args):
     build_conda_package(mc, conda_meta, binstar_user=BINSTAR_USER)
     print('successfully built conda package, proceeding to upload')
     binstar_upload_if_appropriate(mc, conda_meta, BINSTAR_USER, BINSTAR_KEY)
-    upload_to_pypi_if_appropriate(mc, conda_meta, PYPI_USER, PYPI_PASSWORD)
+    upload_to_pypi_if_appropriate(mc, conda_meta, PYPI_USER, PYPI_PASSWORD,
+                                  PYPI_TEST_USER, PYPI_TEST_PASSWORD)
 
 
 if __name__ == "__main__":
