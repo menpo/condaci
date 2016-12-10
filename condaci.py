@@ -793,7 +793,19 @@ def upload_to_pypi_if_appropriate(mc, path, username, password,
         print('Not on key node (Linux Python {}) - no PyPI sdist upload'
               .format(PYPI_SDIST_UPLOAD_PYTHON_VERSION))
         return
-    
+
+    print('Finding last-used conda build work dir and build env')
+    work_dir = unique_last_used_conda_build_work_dir(mc)
+    build_env_dir = unique_last_used_conda_build_build_env(mc)
+    print('Found last build env: {}'.format(build_env_dir))
+    print('Found last work dir: {}'.format(work_dir))
+
+    setup_py = p.join(work_dir, 'setup.py')
+    if not p.isfile(setup_py):
+        print('No setup.py found at {} - '
+              'not uploading to PyPI'.format(setup_py))
+        return
+
     v = get_version(path)
 
     if is_rc_tag(v):
@@ -809,16 +821,9 @@ def upload_to_pypi_if_appropriate(mc, path, username, password,
     print('Setting up .pypirc file..')
     pypi_setup_dotfile(username, password, test_username, test_password)
 
-    print('Finding last-used conda build work dir and build env')
-    work_dir = unique_last_used_conda_build_work_dir(mc)
-    build_env_dir = unique_last_used_conda_build_build_env(mc)
-    print('Found last build env: {}'.format(build_env_dir))
-    print('Found last work dir: {}'.format(work_dir))
     print("Uploading to PyPI user '{}'".format(username))
-    execute([python(build_env_dir), p.join(work_dir, 'setup.py'),
-             'register', '-r', repo])
-    execute([python(build_env_dir), p.join(work_dir, 'setup.py'),
-             'sdist', 'upload', '-r', repo])
+    execute([python(build_env_dir), setup_py, 'register', '-r', repo])
+    execute([python(build_env_dir), setup_py, 'sdist', 'upload', '-r', repo])
 
 
 # --------------------------- ARGPARSE COMMANDS ----------------------------- #
