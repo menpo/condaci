@@ -279,7 +279,7 @@ binstar = lambda mc: p.join(miniconda_script_dir(mc), 'anaconda' + exec_ext)
 
 def unique_path_matching_glob(path_with_glob):
     possible_paths = glob.glob(path_with_glob)
-    if not len(possible_paths) != 1:
+    if len(possible_paths) != 1:
         raise ValueError("Couldn't find unique path matching glob {} - "
                          "found {}: {}".format(path_with_glob,
                                                len(possible_paths),
