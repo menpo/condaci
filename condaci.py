@@ -392,7 +392,7 @@ def build_conda_package(mc, path, binstar_user=None):
     for key in SECRET_ENVS:
         if key in os.environ:
             print('found {} in environment - deleting to '
-                  'stop vcvarsall from telling the world').format(key)
+                  'stop vcvarsall from telling the world'.format(key))
             del os.environ[key]
 
     if is_windows():
@@ -713,10 +713,11 @@ def binstar_channel_from_ci(path):
 
 # -------------------- PYPI INTEGRATION ---------------------- #
 
+PYPI_SDIST_UPLOAD_PYTHON_VERSION = '3.5'
 pypirc_path = lambda: p.join(p.expanduser('~'), '.pypirc')
-pypi_upload_allowed = lambda: (host_platform() == 'Linux' and
-                               ARCH == 'x64' and
-                               sys.version_info.major == 3)
+pypi_sdist_upload_allowed = lambda: (host_platform() == 'Linux' and
+                                     PYTHON_VERSION ==
+                                     PYPI_SDIST_UPLOAD_PYTHON_VERSION)
 
 pypi_template = """[distutils]
 index-servers=
@@ -748,9 +749,10 @@ def upload_to_pypi_if_appropriate(mc, path, username, password):
         print('-> Unable to upload to PyPI')
         return
     
-    if not pypi_upload_allowed():
-        print('Not on key node (Linux x64 Py3) - no PyPI sdist upload')
-        return    
+    if not pypi_sdist_upload_allowed():
+        print('Not on key node (Linux Python {}) - no PyPI sdist upload'
+              .format(PYPI_SDIST_UPLOAD_PYTHON_VERSION))
+        return
     
     v = get_version(path)
 
