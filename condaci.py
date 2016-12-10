@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import subprocess
+import glob
 import os
 import contextlib
 import shutil
@@ -37,11 +38,20 @@ PYTHON_VERSION = None
 PYTHON_VERSION_NO_DOT = None
 BINSTAR_USER = None
 BINSTAR_KEY = None
+PYPI_USER = None
+PYPI_PASSWORD = None
+PYPI_TEST_USER = None
+PYPI_TEST_PASSWORD = None
 ARCH = None
+
+# Env variables that we need to be careful to purge (so they aren't
+# divulged by accident)
+SECRET_ENVS = ['BINSTAR_KEY', 'PYPI_PASSWORD', 'PYPI_TEST_PASSWORD']
 
 
 def set_globals_from_environ(verbose=True):
-    global PYTHON_VERSION, BINSTAR_KEY, BINSTAR_USER, PYTHON_VERSION_NO_DOT, ARCH
+    global PYTHON_VERSION, BINSTAR_KEY, BINSTAR_USER, PYTHON_VERSION_NO_DOT
+    global PYPI_USER, PYPI_PASSWORD, PYPI_TEST_USER, PYPI_TEST_PASSWORD, ARCH
 
     if not (is_on_appveyor() or is_on_travis() or is_on_jenkins()):
         raise ValueError('FATAL: Unknown CI system.')
@@ -58,14 +68,24 @@ def set_globals_from_environ(verbose=True):
         arch_origin = 'Python'
     BINSTAR_USER = os.environ.get('BINSTAR_USER')
     BINSTAR_KEY = os.environ.get('BINSTAR_KEY')
+    PYPI_USER = os.environ.get('PYPI_USER')
+    PYPI_PASSWORD = os.environ.get('PYPI_PASSWORD')
+    PYPI_TEST_USER = os.environ.get('PYPI_TEST_USER')
+    PYPI_TEST_PASSWORD = os.environ.get('PYPI_TEST_PASSWORD')
 
     if verbose:
         print('Environment variables extracted:')
-        print('  PYTHON_VERSION: {}'.format(PYTHON_VERSION))
-        print('  ARCH:           {} - ({})'.format(ARCH, arch_origin))
-        print('  BINSTAR_USER:   {}'.format(BINSTAR_USER))
-        print('  BINSTAR_KEY:    {}'.format('*****' if BINSTAR_KEY is not None
-                                            else '-'))
+        print('  PYTHON_VERSION:     {}'.format(PYTHON_VERSION))
+        print('  ARCH:               {} - ({})'.format(ARCH, arch_origin))
+        print('  BINSTAR_USER:       {}'.format(BINSTAR_USER))
+        print('  BINSTAR_KEY:        {}'.format('*****' if BINSTAR_KEY
+                                                is not None else '-'))
+        print('  PYPI_USER:          {}'.format(PYPI_USER))
+        print('  PYPI_PASSWORD:      {}'.format('*****' if PYPI_PASSWORD
+                                                is not None else '-'))
+        print('  PYPI_TEST_USER:     {}'.format(PYPI_TEST_USER))
+        print('  PYPI_TEST_PASSWORD: {}'.format('*****' if PYPI_TEST_PASSWORD
+                                                is not None else '-'))
 
     if PYTHON_VERSION is None:
         raise ValueError('FATAL: PYTHON_VERSION is not set.')
@@ -258,8 +278,30 @@ def miniconda_script_dir_name():
 # handles to binaries from a miniconda install
 exec_ext = '.exe' if is_windows() else ''
 miniconda_script_dir = lambda mc: p.join(mc, miniconda_script_dir_name())
+miniconda_conda_bld_dir = lambda mc: p.join(mc, 'conda-bld')
 conda = lambda mc: p.join(miniconda_script_dir(mc), 'conda' + exec_ext)
+python = lambda mc: p.join(miniconda_script_dir(mc), 'python' + exec_ext)
 binstar = lambda mc: p.join(miniconda_script_dir(mc), 'anaconda' + exec_ext)
+
+
+def unique_path_matching_glob(path_with_glob):
+    possible_paths = glob.glob(path_with_glob)
+    if len(possible_paths) != 1:
+        raise ValueError("Couldn't find unique path matching glob {} - "
+                         "found {}: {}".format(path_with_glob,
+                                               len(possible_paths),
+                                               possible_paths))
+    return possible_paths[0]
+
+
+def unique_last_used_conda_build_build_env(mc):
+    return unique_path_matching_glob(p.join(miniconda_conda_bld_dir(mc),
+                                            'conda_*', '_b_env*'))
+
+
+def unique_last_used_conda_build_work_dir(mc):
+    return unique_path_matching_glob(p.join(miniconda_conda_bld_dir(mc),
+                                            'conda_*', 'work'))
 
 
 def acquire_miniconda(url, path_to_download):
@@ -376,17 +418,22 @@ def build_conda_package(mc, path, binstar_user=None):
     else:
         print('building a RC or tag release - no master channel added.')
 
-    if 'BINSTAR_KEY' in os.environ:
-        print('found BINSTAR_KEY in environment - deleting to '
-              'prevent from leaking.')
-        del os.environ['BINSTAR_KEY']
+    for key in SECRET_ENVS:
+        if key in os.environ:
+            print('found {} in environment - deleting to '
+                  'stop vcvarsall from telling the world'.format(key))
+            del os.environ[key]
 
     if is_windows():
         # Before building the package, we may need to edit the environment a bit
         # to handle the nightmare that is Visual Studio compilation
         windows_setup_compiler()
+    # Always purge the conda-bld dir before this build (so we can unambiguously
+    # find it after the build if we need to)
+    execute([conda(mc), 'build', 'purge'])
+    # Note the '--keep-old-work' arg so we can inspect this build dir afterwards
     execute([conda(mc), 'build', '-q', path,
-             '--py={}'.format(PYTHON_VERSION_NO_DOT)])
+             '--py={}'.format(PYTHON_VERSION_NO_DOT), '--keep-old-work'])
 
 
 # ------------------------- VERSIONING INTEGRATION -------------------------- #
@@ -697,40 +744,81 @@ def binstar_channel_from_ci(path):
         return branch_from_ci()
 
 
-# -------------------- [EXPERIMENTAL] PYPI INTEGRATION ---------------------- #
+# -------------------- PYPI INTEGRATION ---------------------- #
 
-# pypirc_path = p.join(p.expanduser('~'), '.pypirc')
-# pypi_upload_allowed = (host_platform() == 'Linux' and
-#                        host_arch() == 'x64' and
-#                        sys.version_info.major == 2)
-#
-# pypi_template = """[distutils]
-# index-servers = pypi
-#
-# [pypi]
-# username:{}
-# password:{}"""
-#
-#
-# def pypi_setup_dotfile(username, password):
-#     with open(pypirc_path, 'wb') as f:
-#         f.write(pypi_template.format(username, password))
-#
-#
-# def upload_to_pypi_if_appropriate(mc, username, password):
-#     if username is None or password is None:
-#         print('Missing PyPI username or password, skipping upload')
-#         return
-#     v = get_version()
-#     if not is_release_tag(v):
-#         print('Not on a tagged release - not uploading to PyPI')
-#         return
-#     if not pypi_upload_allowed:
-#         print('Not on key node (Linux 64 Py2) - no PyPI upload')
-#     print('Setting up .pypirc file..')
-#     pypi_setup_dotfile(username, password)
-#     print("Uploading to PyPI user '{}'".format(username))
-#     execute_sequence([python(mc), 'setup.py', 'sdist', 'upload'])
+PYPI_SDIST_UPLOAD_PYTHON_VERSION = '3.5'
+pypirc_path = lambda: p.join(p.expanduser('~'), '.pypirc')
+pypi_sdist_upload_allowed = lambda: (host_platform() == 'Linux' and
+                                     PYTHON_VERSION ==
+                                     PYPI_SDIST_UPLOAD_PYTHON_VERSION)
+
+pypi_template = """[distutils]
+index-servers =
+    pypi
+    pypitest
+
+[pypi]
+repository: https://pypi.python.org/pypi
+username: {username}
+password: {password}
+
+[pypitest]
+repository: https://testpypi.python.org/pypi
+username: {test_username}
+password: {test_password}"""
+
+
+def pypi_setup_dotfile(username, password, test_username, test_password):
+    with open(pypirc_path(), 'wt') as f:
+        f.write(pypi_template.format(username=username, password=password,
+                                     test_username=test_username,
+                                     test_password=test_password))
+
+
+def upload_to_pypi_if_appropriate(mc, path, username, password,
+                                  test_username, test_password):
+    if username is None:
+        print('No PyPI username provided')
+    if password is None:
+        print('No PyPI password provided')
+    if test_username is None:
+        print('No PyPI test username provided')
+    if test_password is None:
+        print('No PyPI test password provided')
+    if None in {username, password, test_username, test_password}:
+        print('-> Unable to upload to PyPI')
+        return
+    
+    if not pypi_sdist_upload_allowed():
+        print('Not on key node (Linux Python {}) - no PyPI sdist upload'
+              .format(PYPI_SDIST_UPLOAD_PYTHON_VERSION))
+        return
+    
+    v = get_version(path)
+
+    if is_rc_tag(v):
+        print('RC tag: uploading to test PyPI repository')
+        repo = 'pypitest'
+    elif is_release_tag(v):
+        print('Release tag: uploading to main PyPI repository')
+        repo = 'pypi'
+    else:
+        print('Not release tag or RC tag - no PyPI upload')
+        return  
+
+    print('Setting up .pypirc file..')
+    pypi_setup_dotfile(username, password, test_username, test_password)
+
+    print('Finding last-used conda build work dir and build env')
+    work_dir = unique_last_used_conda_build_work_dir(mc)
+    build_env_dir = unique_last_used_conda_build_build_env(mc)
+    print('Found last build env: {}'.format(build_env_dir))
+    print('Found last work dir: {}'.format(work_dir))
+    print("Uploading to PyPI user '{}'".format(username))
+    execute([python(build_env_dir), p.join(work_dir, 'setup.py'),
+             'register', '-r', repo])
+    execute([python(build_env_dir), p.join(work_dir, 'setup.py'),
+             'sdist', 'upload', '-r', repo])
 
 
 # --------------------------- ARGPARSE COMMANDS ----------------------------- #
@@ -754,7 +842,8 @@ def build_cmd(args):
     build_conda_package(mc, conda_meta, binstar_user=BINSTAR_USER)
     print('successfully built conda package, proceeding to upload')
     binstar_upload_if_appropriate(mc, conda_meta, BINSTAR_USER, BINSTAR_KEY)
-    # upload_to_pypi_if_appropriate(mc, args.pypiuser, args.pypipassword)
+    upload_to_pypi_if_appropriate(mc, conda_meta, PYPI_USER, PYPI_PASSWORD,
+                                  PYPI_TEST_USER, PYPI_TEST_PASSWORD)
 
 
 if __name__ == "__main__":
