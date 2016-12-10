@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import subprocess
+import glob
 import os
 import contextlib
 import shutil
@@ -270,9 +271,30 @@ def miniconda_script_dir_name():
 # handles to binaries from a miniconda install
 exec_ext = '.exe' if is_windows() else ''
 miniconda_script_dir = lambda mc: p.join(mc, miniconda_script_dir_name())
+miniconda_conda_bld_dir = lambda mc: p.join(mc, 'conda-bld')
 conda = lambda mc: p.join(miniconda_script_dir(mc), 'conda' + exec_ext)
 python = lambda mc: p.join(miniconda_script_dir(mc), 'python' + exec_ext)
 binstar = lambda mc: p.join(miniconda_script_dir(mc), 'anaconda' + exec_ext)
+
+
+def unique_path_matching_glob(path_with_glob):
+    possible_paths = glob.glob(path_with_glob)
+    if not len(possible_paths) != 1:
+        raise ValueError("Couldn't find unique path matching glob {} - "
+                         "found {}: {}".format(path_with_glob,
+                                               len(possible_paths),
+                                               possible_paths))
+    return possible_paths[0]
+
+
+def unique_last_used_conda_build_build_env(mc):
+    return unique_path_matching_glob(p.join(miniconda_conda_bld_dir(mc),
+                                            'conda_*', '_b_env*'))
+
+
+def unique_last_used_conda_build_work_dir(mc):
+    return unique_path_matching_glob(p.join(miniconda_conda_bld_dir(mc),
+                                            'conda_*', 'work'))
 
 
 def acquire_miniconda(url, path_to_download):
@@ -399,8 +421,12 @@ def build_conda_package(mc, path, binstar_user=None):
         # Before building the package, we may need to edit the environment a bit
         # to handle the nightmare that is Visual Studio compilation
         windows_setup_compiler()
+    # Always purge the conda-bld dir before this build (so we can unambiguously
+    # find it after the build if we need to)
+    execute([conda(mc), 'build', 'purge'])
+    # Note the '--keep-old-work' arg so we can inspect this build dir afterwards
     execute([conda(mc), 'build', '-q', path,
-             '--py={}'.format(PYTHON_VERSION_NO_DOT)])
+             '--py={}'.format(PYTHON_VERSION_NO_DOT), '--keep-old-work'])
 
 
 # ------------------------- VERSIONING INTEGRATION -------------------------- #
@@ -770,9 +796,16 @@ def upload_to_pypi_if_appropriate(mc, path, username, password):
     print('Setting up .pypirc file..')
     pypi_setup_dotfile(username, password)
 
+    print('Finding last-used conda build work dir and build env')
+    work_dir = unique_last_used_conda_build_work_dir(mc)
+    build_env_dir = unique_last_used_conda_build_build_env(mc)
+    print('Found last build env: {}'.format(build_env_dir))
+    print('Found last work dir: {}'.format(work_dir))
     print("Uploading to PyPI user '{}'".format(username))
-    execute([python(mc), 'setup.py', 'register', '-r', repo])
-    execute([python(mc), 'setup.py', 'sdist', 'upload', '-r', repo])
+    execute([python(build_env_dir), p.join(work_dir, 'setup.py'),
+             'register', '-r', repo])
+    execute([python(build_env_dir), p.join(work_dir, 'setup.py'),
+             'sdist', 'upload', '-r', repo])
 
 
 # --------------------------- ARGPARSE COMMANDS ----------------------------- #
