@@ -794,15 +794,14 @@ def upload_to_pypi_if_appropriate(mc, path, username, password,
               .format(PYPI_SDIST_UPLOAD_PYTHON_VERSION))
         return
 
-    print('Finding last-used conda build work dir and build env')
-    work_dir = unique_last_used_conda_build_work_dir(mc)
+    print('Finding last-used conda-build build env')
     build_env_dir = unique_last_used_conda_build_build_env(mc)
     print('Found last build env: {}'.format(build_env_dir))
-    print('Found last work dir: {}'.format(work_dir))
-
-    setup_py = p.join(work_dir, 'setup.py')
+    
+    print('Attempting to use setup.py in current working dir')
+    setup_py = p.abspath('./setup.py')
     if not p.isfile(setup_py):
-        print('No setup.py found at {} - '
+        print('No setup.py found in current working dir ({}) - '
               'not uploading to PyPI'.format(setup_py))
         return
 
