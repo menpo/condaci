@@ -428,9 +428,14 @@ def build_conda_package(mc, path, binstar_user=None):
         # Before building the package, we may need to edit the environment a bit
         # to handle the nightmare that is Visual Studio compilation
         windows_setup_compiler()
+
     # Always purge the conda-bld dir before this build (so we can unambiguously
-    # find it after the build if we need to)
+    # find it after the build if we need to).
     execute([conda(mc), 'build', 'purge'])
+
+    # Also clean all conda caches to remove previous build artifacts
+    execute([conda(mc), 'clean', 'all', '--yes'])
+
     # Note the '--keep-old-work' arg so we can inspect this build dir afterwards
     execute([conda(mc), 'build', '-q', path,
              '--py={}'.format(PYTHON_VERSION_NO_DOT), '--keep-old-work'])
