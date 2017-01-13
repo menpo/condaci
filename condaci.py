@@ -431,7 +431,7 @@ def build_conda_package(mc, path, binstar_user=None):
 
     # Always purge the conda-bld dir before this build (so we can unambiguously
     # find it after the build if we need to).
-    execute([conda(mc), 'build', 'purge'])
+    execute([conda(mc), 'build', 'purge-all'])
 
     # Also clean all conda caches to remove previous build artifacts
     execute([conda(mc), 'clean', '--all', '--yes'])
