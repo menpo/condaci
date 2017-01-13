@@ -479,6 +479,11 @@ def get_version(path):
     if len(versions) == 1:
         version = versions[0]
         print('Found unambiguous versioneer version: {}'.format(version))
+        if 'dirty' in version:
+            print("WARNING - 'dirty' in version string - something has dirtied the working dir!")
+            print("        - Printing git status/git diff to diagnose what's wrong")
+            execute(['git', 'status'])
+            execute(['git', 'diff'])
     elif len(versions) > 1:
         raise ValueError('Multiple versioneer _version.py files - cannot '
                          'resolve unambiguous version. '
