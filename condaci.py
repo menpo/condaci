@@ -434,7 +434,7 @@ def build_conda_package(mc, path, binstar_user=None):
     execute([conda(mc), 'build', 'purge'])
 
     # Also clean all conda caches to remove previous build artifacts
-    execute([conda(mc), 'clean', 'all', '--yes'])
+    execute([conda(mc), 'clean', '--all', '--yes'])
 
     # Note the '--keep-old-work' arg so we can inspect this build dir afterwards
     execute([conda(mc), 'build', '-q', path,
