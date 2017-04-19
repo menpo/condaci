@@ -347,14 +347,11 @@ def setup_miniconda(installation_path, binstar_user=None):
 # ------------------------ CONDA BUILD INTEGRATION -------------------------- #
 
 def get_conda_build_path(recipe_dir):
-    try:
-        from conda_build.metadata import MetaData
-        from conda_build.build import bldpkg_path
-        m = MetaData(recipe_dir)
-        fname = bldpkg_path(m)
-        return fname.strip()
-    except:
-        raise ValueError('Unable to find recipe_dir')
+    from conda_build.metadata import MetaData
+    from conda_build.build import bldpkg_path
+    m = MetaData(recipe_dir)
+    fname = bldpkg_path(m)
+    return fname.strip()
 
 
 def windows_setup_compiler():
