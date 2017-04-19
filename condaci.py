@@ -176,7 +176,7 @@ def download_file(url, path_to_download):
 
 
 def dirs_containing_file(fname, root=os.curdir):
-    for path, dirs, files in os.walk(os.path.abspath(root)):
+    for path, dirs, files in os.walk(p.abspath(root)):
         if fname in files:
             yield path
 
@@ -351,13 +351,7 @@ def get_conda_build_path(recipe_dir):
         from conda_build.metadata import MetaData
         from conda_build.build import bldpkg_path
         m = MetaData(recipe_dir)
-        try:
-            # conda-build >= 2
-            from conda_build.config import Config
-            config = Config()
-            fname = bldpkg_path(m, config)
-        except TypeError:
-            fname = bldpkg_path(m)
+        fname = bldpkg_path(m)
         return fname.strip()
     except:
         raise ValueError('Unable to find recipe_dir')
@@ -848,7 +842,7 @@ def setup_cmd(_):
 def build_cmd(args):
     set_globals_from_environ()
     mc = miniconda_dir()
-    conda_meta = args.meta_yaml_dir
+    conda_meta = p.abspath(args.meta_yaml_dir)
 
     build_conda_package(mc, conda_meta, binstar_user=BINSTAR_USER)
     print('successfully built conda package, proceeding to upload')
