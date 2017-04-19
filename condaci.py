@@ -436,10 +436,10 @@ def build_conda_package(mc, path, binstar_user=None):
     # Also clean all conda caches to remove previous build artifacts
     execute([conda(mc), 'clean', '--all', '--yes'])
 
-    # Note the '--keep-old-work' arg so we can inspect this build dir afterwards
+    # Note the '--dirty' arg so we can inspect this build dir afterwards
     # --no-build-id ensures that we get b_env style folder structures
     execute([conda(mc), 'build', '-q', path,
-             '--py={}'.format(PYTHON_VERSION_NO_DOT), '--keep-old-work',
+             '--py={}'.format(PYTHON_VERSION_NO_DOT), '--dirty',
              '--no-build-id'])
 
 
