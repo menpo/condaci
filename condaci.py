@@ -216,7 +216,7 @@ def url_for_platform_version(platform, arch):
 
 def appveyor_miniconda_dir():
     # We always prefer the Miniconda3 version
-    conda_dir = r'C:\Miniconda3'
+    conda_dir = r'C:\Miniconda36'
 
     if ARCH == 'x64':
         conda_dir += '-x64'
