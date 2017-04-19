@@ -296,12 +296,7 @@ def unique_path_matching_glob(path_with_glob):
 
 def unique_last_used_conda_build_build_env(mc):
     return unique_path_matching_glob(p.join(miniconda_conda_bld_dir(mc),
-                                            'conda_*', '_b_env*'))
-
-
-def unique_last_used_conda_build_work_dir(mc):
-    return unique_path_matching_glob(p.join(miniconda_conda_bld_dir(mc),
-                                            'conda_*', 'work'))
+                                            '_b_env*'))
 
 
 def acquire_miniconda(url, path_to_download):
