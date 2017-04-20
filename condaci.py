@@ -403,6 +403,13 @@ def build_conda_package(mc, path, binstar_user=None):
                      binstar_user + '/channel/master'])
     else:
         print('building a RC or tag release - no master channel added.')
+        print('Checking to see if this build is a duplicate...')
+        if is_on_travis() and travis_build_is_duplicate():
+            print('On travis and this is a duplicate build of a tag - '
+                  'travis will have also kicked off a build for the branch '
+                  'with this tag on it.')
+            print('Exiting this build now.')
+            sys.exit(0)
 
     for key in SECRET_ENVS:
         if key in os.environ:
@@ -697,6 +704,17 @@ def branch_from_travis():
         return branch
 
 
+def travis_build_is_duplicate():
+    tag = os.environ['TRAVIS_TAG']
+    branch = os.environ['TRAVIS_BRANCH']
+    print(tag)
+    print(branch)
+    # Travis will kick off two builds for tags - a build specifically for the tag, *and*
+    # a normal build for the branch. This means we do the same work twice, which leads to
+    # failures with uploads. Detect one of the two conditions here so we can bail.
+    return branch == tag
+
+        
 def is_pr_on_ci():
     if is_on_travis():
         return is_pr_from_travis()
