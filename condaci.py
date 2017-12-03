@@ -103,7 +103,6 @@ def set_globals_from_environ(verbose=True):
 
 
 class FakeSink(object):
-
     def write(self, *args, **kwargs):
         pass
 
@@ -112,11 +111,18 @@ class FakeSink(object):
 
 
 @contextlib.contextmanager
-def suppress_stdout():
+def suppress_stdout(include_stderr=False):
     cached_stdout = sys.stdout
     sys.stdout = FakeSink()
+    if include_stderr:
+        cached_stderr = sys.stderr
+        sys.stderr = FakeSink()
+
     yield
+
     sys.stdout = cached_stdout
+    if include_stderr:
+        sys.stderr = cached_stderr
 
 
 # forward stderr to stdout
@@ -346,12 +352,37 @@ def setup_miniconda(installation_path, binstar_user=None):
 
 # ------------------------ CONDA BUILD INTEGRATION -------------------------- #
 
-def get_conda_build_path(recipe_dir):
+def get_conda_build_path_v3(recipe_dir):
+    with suppress_stdout(include_stderr=True):
+        from conda_build.config import Config
+        from conda_build.api import get_output_file_paths
+        c = Config(variant={'python': PYTHON_VERSION})
+        return get_output_file_paths(recipe_dir, no_download_source=True,
+                                     config=c)[0]
+
+
+def get_conda_build_path_v1_v2(recipe_dir):
     from conda_build.metadata import MetaData
     from conda_build.build import bldpkg_path
     m = MetaData(recipe_dir)
     fname = bldpkg_path(m)
     return fname.strip()
+
+
+def get_conda_build_path(recipe_dir):
+    from distutils.version import LooseVersion
+    import conda_build
+    cb_ver = LooseVersion(conda_build.__version__)
+    if cb_ver < '3':
+        return get_conda_build_path_v1_v2(recipe_dir)
+    else:  # cb_ver >= 3
+        if cb_ver >= '4':
+            # conda-build 4 is unreleased at the time of commit so it is unknown
+            # how stable this API is. Fallback th the v3 API and hope but
+            # otherwise just signal that there may be an issue
+            print('WARNING: conda-build version "{}" is untested with '
+                  'condaci - there may be failures'.format(cb_ver))
+        return get_conda_build_path_v3(recipe_dir)
 
 
 def windows_setup_compiler():
@@ -714,7 +745,7 @@ def travis_build_is_duplicate():
     # failures with uploads. Detect one of the two conditions here so we can bail.
     return branch == tag
 
-        
+
 def is_pr_on_ci():
     if is_on_travis():
         return is_pr_from_travis()
@@ -804,7 +835,7 @@ def upload_to_pypi_if_appropriate(mc, path, username, password,
     if None in {username, password, test_username, test_password}:
         print('-> Unable to upload to PyPI')
         return
-    
+
     if not pypi_sdist_upload_allowed():
         print('Not on key node (Linux Python {}) - no PyPI sdist upload'
               .format(PYPI_SDIST_UPLOAD_PYTHON_VERSION))
@@ -813,7 +844,7 @@ def upload_to_pypi_if_appropriate(mc, path, username, password,
     print('Finding last-used conda-build build env')
     build_env_dir = unique_last_used_conda_build_build_env(mc)
     print('Found last build env: {}'.format(build_env_dir))
-    
+
     print('Attempting to use setup.py in current working dir')
     setup_py = p.abspath('./setup.py')
     if not p.isfile(setup_py):
@@ -831,7 +862,7 @@ def upload_to_pypi_if_appropriate(mc, path, username, password,
         repo = 'pypi'
     else:
         print('Not release tag or RC tag - no PyPI upload')
-        return  
+        return
 
     print('Setting up .pypirc file..')
     pypi_setup_dotfile(username, password, test_username, test_password)
