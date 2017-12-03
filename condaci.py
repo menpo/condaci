@@ -293,7 +293,7 @@ binstar = lambda mc: p.join(miniconda_script_dir(mc), 'anaconda' + exec_ext)
 def unique_path_matching_glob(path_with_glob):
     possible_paths = glob.glob(path_with_glob)
     if len(possible_paths) != 1:
-        raise ValueError("Couldn't find unique path matching glob {} - "
+        raise ValueError("Couldn't find unique path matching glob '{}' - "
                          "found {}: {}".format(path_with_glob,
                                                len(possible_paths),
                                                possible_paths))
@@ -301,8 +301,14 @@ def unique_path_matching_glob(path_with_glob):
 
 
 def unique_last_used_conda_build_build_env(mc):
-    return unique_path_matching_glob(p.join(miniconda_conda_bld_dir(mc),
-                                            '_b_env*'))
+    try:
+        return unique_path_matching_glob(p.join(miniconda_conda_bld_dir(mc),
+                                                '_h_env*'))
+    except ValueError as e:
+        print(e)
+        # Fallback to _b_env (conda-build < 3)
+        return unique_path_matching_glob(p.join(miniconda_conda_bld_dir(mc),
+                                                '_b_env*'))
 
 
 def acquire_miniconda(url, path_to_download):
