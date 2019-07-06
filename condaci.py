@@ -275,15 +275,9 @@ def unique_path_matching_glob(path_with_glob):
     return possible_paths[0]
 
 
-def unique_last_used_conda_build_build_env(mc):
-    try:
-        return unique_path_matching_glob(p.join(miniconda_conda_bld_dir(mc),
-                                                '_h_env*'))
-    except ValueError as e:
-        print(e)
-        # Fallback to _b_env (conda-build < 3)
-        return unique_path_matching_glob(p.join(miniconda_conda_bld_dir(mc),
-                                                '_b_env*'))
+def get_dirty_work_dir(mc):
+    return unique_path_matching_glob(p.join(miniconda_conda_bld_dir(mc),
+                                            'work_moved_*'))
 
 
 def acquire_miniconda(url, path_to_download):
@@ -317,7 +311,7 @@ def setup_miniconda(installation_path, binstar_user=None, extra_channels=None):
         os.unlink(temp_installer_path())
     cmds = [[conda_cmd, 'update', '-q', '--yes', 'conda'],
             [conda_cmd, 'install', '-q', '--yes', 'conda-build', 'conda-verify',
-             'jinja2', 'ripgrep', 'anaconda-client']]
+             'jinja2', 'ripgrep', 'anaconda-client', 'twine']]
     root_config = os.path.join(installation_path, '.condarc')
     if os.path.exists(root_config):
         print('existing root config at present at {} - removing'.format(root_config))
@@ -768,35 +762,32 @@ index-servers =
     pypitest
 
 [pypi]
-repository: https://pypi.python.org/pypi
+repository: https://pypi.org/simple/
 username: {username}
 password: {password}
 
 [pypitest]
-repository: https://testpypi.python.org/pypi
+repository: https://test.pypi.org/legacy/
 username: {test_username}
 password: {test_password}"""
 
 
 def pypi_setup_dotfile(username, password, test_username, test_password):
-    with open(pypirc_path(), 'wt') as f:
+    path = pypirc_path()
+    with open(path, 'wt') as f:
         f.write(pypi_template.format(username=username, password=password,
                                      test_username=test_username,
                                      test_password=test_password))
+    return path
 
 
 def upload_to_pypi_if_appropriate(mc, path, username, password,
                                   test_username, test_password):
-    if username is None:
+    if username is None and test_username is None:
         print('No PyPI username provided')
-    if password is None:
+        return
+    if password is None and test_password is None:
         print('No PyPI password provided')
-    if test_username is None:
-        print('No PyPI test username provided')
-    if test_password is None:
-        print('No PyPI test password provided')
-    if None in {username, password, test_username, test_password}:
-        print('-> Unable to upload to PyPI')
         return
 
     if not pypi_sdist_upload_allowed():
@@ -804,9 +795,8 @@ def upload_to_pypi_if_appropriate(mc, path, username, password,
               .format(PYPI_SDIST_UPLOAD_PYTHON_VERSION))
         return
 
-    print('Finding last-used conda-build build env')
-    build_env_dir = unique_last_used_conda_build_build_env(mc)
-    print('Found last build env: {}'.format(build_env_dir))
+    sdist_dir = p.join(get_dirty_work_dir(mc), 'dist/*')
+    print('Found build sdist directory: {}'.format(sdist_dir))
 
     print('Attempting to use setup.py in current working dir')
     setup_py = p.abspath('./setup.py')
@@ -828,11 +818,12 @@ def upload_to_pypi_if_appropriate(mc, path, username, password,
         return
 
     print('Setting up .pypirc file..')
-    pypi_setup_dotfile(username, password, test_username, test_password)
+    twine_config_path = pypi_setup_dotfile(username, password,
+                                           test_username, test_password)
 
     print("Uploading to PyPI user '{}'".format(username))
-    execute([python(build_env_dir), setup_py, 'register', '-r', repo])
-    execute([python(build_env_dir), setup_py, 'sdist', 'upload', '-r', repo])
+    execute(['twine', 'upload', '-r', repo,
+             '--config-file', twine_config_path, sdist_dir])
 
 
 # --------------------------- ARGPARSE COMMANDS ----------------------------- #
