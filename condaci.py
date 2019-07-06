@@ -327,7 +327,7 @@ def install_miniconda(path_to_installer, path_to_install):
         execute([path_to_installer, '-b', '-p', path_to_install])
 
 
-def setup_miniconda(installation_path, binstar_user=None):
+def setup_miniconda(installation_path, binstar_user=None, extra_channels=None):
     conda_cmd = conda(installation_path)
     if os.path.exists(conda_cmd):
         print('conda is already setup at {}'.format(installation_path))
@@ -353,6 +353,12 @@ def setup_miniconda(installation_path, binstar_user=None):
     else:
         print('No user channels have been configured (all dependencies have to '
               'be sourced from anaconda)')
+    if extra_channels is not None:
+        # Loop in reverse order to ensure the first channel in the list has
+        # highest precedence
+        for c in extra_channels[::-1]:
+            print("adding extra channel '{}' for dependencies to root config".format(c))
+            cmds.append([conda_cmd, 'config', '--system', '--add', 'channels', c])
     execute_sequence(*cmds)
 
 
@@ -885,10 +891,10 @@ def miniconda_dir_cmd(_):
     print(miniconda_dir())
 
 
-def setup_cmd(_):
+def setup_cmd(args):
     set_globals_from_environ()
     mc = miniconda_dir()
-    setup_miniconda(mc, binstar_user=BINSTAR_USER)
+    setup_miniconda(mc, binstar_user=BINSTAR_USER, extra_channels=args.channels)
 
 
 def build_cmd(args):
@@ -915,18 +921,24 @@ if __name__ == "__main__":
         """)
     subp = pa.add_subparsers()
 
-    sp = subp.add_parser('setup', help='setup a miniconda environment')
+    sp = subp.add_parser('setup', help='Setup a miniconda environment')
+    sp.add_argument('--channels', type=str, nargs='+',
+                    help="A list of space separated conda channels to add "
+                         "to the set of default channels. Note that they "
+                         "are prepended to the default channels list in the "
+                         "order provided and thus the first channel in the "
+                         "list will have the highest precedence")
     sp.set_defaults(func=setup_cmd)
 
     bp = subp.add_parser('build', help='run a conda build')
     bp.add_argument('meta_yaml_dir',
-                    help="path to the dir containing the conda 'meta.yaml'"
+                    help="Path to the dir containing the conda 'meta.yaml'"
                          "build script")
+    bp.set_defaults(func=build_cmd)
 
     mp = subp.add_parser('miniconda_dir',
-                         help='path to the miniconda root directory')
+                         help='Path to the miniconda root directory')
     mp.set_defaults(func=miniconda_dir_cmd)
 
-    bp.set_defaults(func=build_cmd)
     args = pa.parse_args()
     args.func(args)
