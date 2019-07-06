@@ -262,6 +262,7 @@ miniconda_script_dir = lambda mc: p.join(mc, miniconda_script_dir_name())
 miniconda_conda_bld_dir = lambda mc: p.join(mc, 'conda-bld')
 conda = lambda mc: p.join(miniconda_script_dir(mc), 'conda' + exec_ext)
 python = lambda mc: p.join(miniconda_script_dir(mc), 'python' + exec_ext)
+twine = lambda mc: p.join(miniconda_script_dir(mc), 'twine' + exec_ext)
 binstar = lambda mc: p.join(miniconda_script_dir(mc), 'anaconda' + exec_ext)
 
 
@@ -798,13 +799,6 @@ def upload_to_pypi_if_appropriate(mc, path, username, password,
     sdist_dir = p.join(get_dirty_work_dir(mc), 'dist/*')
     print('Found build sdist directory: {}'.format(sdist_dir))
 
-    print('Attempting to use setup.py in current working dir')
-    setup_py = p.abspath('./setup.py')
-    if not p.isfile(setup_py):
-        print('No setup.py found in current working dir ({}) - '
-              'not uploading to PyPI'.format(setup_py))
-        return
-
     v = get_version(path)
 
     if is_rc_tag(v):
@@ -822,7 +816,7 @@ def upload_to_pypi_if_appropriate(mc, path, username, password,
                                            test_username, test_password)
 
     print("Uploading to PyPI user '{}'".format(username))
-    execute(['twine', 'upload', '-r', repo,
+    execute([twine(mc), 'upload', '-r', repo,
              '--config-file', twine_config_path, sdist_dir])
 
 
