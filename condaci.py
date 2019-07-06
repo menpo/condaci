@@ -805,7 +805,7 @@ def binstar_channel_from_ci(path):
 
 # -------------------- PYPI INTEGRATION ---------------------- #
 
-PYPI_SDIST_UPLOAD_PYTHON_VERSION = '3.5'
+PYPI_SDIST_UPLOAD_PYTHON_VERSION = os.environ.get('CONDACI_PYPI_SDIST_UPLOAD_PY_VER', '3.5')
 pypirc_path = lambda: p.join(p.expanduser('~'), '.pypirc')
 pypi_sdist_upload_allowed = lambda: (host_platform() == 'Linux' and
                                      PYTHON_VERSION ==
