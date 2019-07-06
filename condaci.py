@@ -53,7 +53,7 @@ def set_globals_from_environ(verbose=True):
     global PYTHON_VERSION, BINSTAR_KEY, BINSTAR_USER, PYTHON_VERSION_NO_DOT
     global PYPI_USER, PYPI_PASSWORD, PYPI_TEST_USER, PYPI_TEST_PASSWORD, ARCH
 
-    if not (is_on_appveyor() or is_on_travis() or is_on_jenkins()):
+    if not (is_on_appveyor() or is_on_travis()):
         raise ValueError('FATAL: Unknown CI system.')
 
     PYTHON_VERSION = os.environ.get('PYTHON_VERSION')
@@ -234,14 +234,6 @@ def travis_miniconda_dir():
     return p.expanduser('~/miniconda')
 
 
-def jenkins_unix_miniconda_dir():
-    return p.expanduser('~/miniconda')
-
-
-def jenkins_windows_miniconda_dir():
-    return r'C:\miniconda'
-
-
 def temp_installer_path():
     # we need a place to download the miniconda installer to. use a random
     # string for the filename to avoid collisions, but choose the dir based
@@ -256,23 +248,6 @@ def miniconda_dir():
         path = appveyor_miniconda_dir()
     elif is_on_travis():
         path = travis_miniconda_dir()
-    elif is_on_jenkins():
-        if is_windows():
-            path = jenkins_windows_miniconda_dir()
-        else:
-            path = jenkins_unix_miniconda_dir()
-
-        # Jenkins persists miniconda installs between builds, but we want a
-        # unique miniconda env for each executor. Therefore, on jenkins
-        # the miniconda paths look like
-        # {MINICONDA_DIR}/{EXECUTOR_NUMBER}/{ARCH}
-        if not os.path.isdir(path):
-            os.mkdir(path)
-        exec_no = os.environ['EXECUTOR_NUMBER']
-        j_path = os.path.join(path, exec_no)
-        if not os.path.isdir(j_path):
-            os.mkdir(j_path)
-        path = os.path.join(j_path, ARCH)
     return path
 
 
@@ -390,7 +365,7 @@ def get_conda_build_path(recipe_dir):
     else:  # cb_ver >= 3
         if cb_ver >= '4':
             # conda-build 4 is unreleased at the time of commit so it is unknown
-            # how stable this API is. Fallback th the v3 API and hope but
+            # how stable this API is. Fallback to the v3 API and hope but
             # otherwise just signal that there may be an issue
             print('WARNING: conda-build version "{}" is untested with '
                   'condaci - there may be failures'.format(cb_ver))
@@ -708,30 +683,11 @@ def binstar_upload_and_purge(mc, key, user, channel, filepath):
 
 is_on_appveyor = lambda: 'APPVEYOR' in os.environ
 is_on_travis = lambda: 'TRAVIS' in os.environ
-is_on_jenkins = lambda: 'JENKINS_URL' in os.environ
 
 is_pr_from_travis = lambda: os.environ['TRAVIS_PULL_REQUEST'] != 'false'
 is_pr_from_appveyor = lambda: 'APPVEYOR_PULL_REQUEST_NUMBER' in os.environ
-# TODO: Remove when ghprb is fixed
-is_pr_from_jenkins = lambda: os.environ['JOB_NAME'].split('/')[0][-3:] == '-pr'
 
 branch_from_appveyor = lambda: os.environ['APPVEYOR_REPO_BRANCH']
-
-
-def branch_from_jenkins():
-    branch = os.environ['GIT_BRANCH']
-    print('Jenkins has set GIT_BRANCH={}'.format(branch))
-    if branch.startswith('origin/tags/'):
-        print('WARNING - on jenkins and GIT_BRANCH starts with origin/tags/. '
-              'This suggests that we are building a tag.')
-        print('Jenkins obscures the branch in this scenario, so we assume that'
-              ' the branch is "master"')
-        return 'master'
-    elif branch.startswith('origin/'):
-        return branch.split('origin/', 1)[-1]
-    else:
-        raise ValueError('Error: jenkins branch name seems '
-                         'suspicious: {}'.format(branch))
 
 
 def branch_from_travis():
@@ -763,10 +719,8 @@ def is_pr_on_ci():
         return is_pr_from_travis()
     elif is_on_appveyor():
         return is_pr_from_appveyor()
-    elif is_on_jenkins():
-        return is_pr_from_jenkins()
     else:
-        raise ValueError("Not on appveyor, travis or jenkins, so can't "
+        raise ValueError("Not on appveyor or travis, so can't "
                          "resolve whether we are on a PR or not")
 
 
@@ -775,11 +729,8 @@ def branch_from_ci():
         return branch_from_travis()
     elif is_on_appveyor():
         return branch_from_appveyor()
-    elif is_on_jenkins():
-        return branch_from_jenkins()
     else:
-        raise ValueError("We aren't on jenkins, "
-                         "Appveyor or Travis so can't "
+        raise ValueError("We aren't on Appveyor or Travis so can't "
                          "decide on branch")
 
 
