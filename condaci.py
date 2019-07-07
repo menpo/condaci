@@ -763,7 +763,7 @@ index-servers =
     pypitest
 
 [pypi]
-repository: https://pypi.org/simple/
+repository: https://upload.pypi.org/legacy/
 username: {username}
 password: {password}
 
