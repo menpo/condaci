@@ -475,31 +475,60 @@ def versions_from_versioneer():
             sys.path.pop(0)
 
 
+def versions_from_miniver():
+    def get_miniver_version(package_path):
+        """Load version.py module without importing the whole package.
+
+        Template code from miniver
+        """
+        import os
+        from importlib.util import module_from_spec, spec_from_file_location
+
+        spec = spec_from_file_location("version", os.path.join(package_path, "_version.py"))
+        module = module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module.__version__
+
+    for dir_ in dirs_containing_file('_version.py'):
+        try:
+            yield get_miniver_version(dir_)
+        except Exception as e:
+            print(e)
+
+
 def version_from_meta_yaml(path):
     from conda_build.metadata import MetaData
     return MetaData(path).version()
 
 
 def get_version(path):
-    # search for versioneer versions in our subdirs
-    versions = list(versions_from_versioneer())
+    # search for versioneer/miniver versions in our subdirs
+    try:
+        versions = list(versions_from_miniver())
+    except:
+        # Fall back to versioneer
+        versions = list(versions_from_versioneer())
 
     if len(versions) == 1:
         version = versions[0]
-        print('Found unambiguous versioneer version: {}'.format(version))
+        print('Found unambiguous version: {}'.format(version))
         if 'dirty' in version:
             print("WARNING - 'dirty' in version string - something has dirtied the working dir!")
             print("        - Printing git status/git diff to diagnose what's wrong")
             execute(['git', 'status'])
             execute(['git', 'diff'])
     elif len(versions) > 1:
-        raise ValueError('Multiple versioneer _version.py files - cannot '
+        raise ValueError('Multiple _version.py files - cannot '
                          'resolve unambiguous version. '
                          'Versions found are: {}'.format(versions))
     else:
-        # this project doesn't seem to be versioneer controlled - maybe the
+        # this project doesn't seem to be versioneer/miniver controlled - maybe the
         # version is hardcoded? Interrogate meta.yaml
         version = version_from_meta_yaml(path)
+
+    if version is None:
+        raise ValueError('Unable to detect version using conda, versioneer or miniver')
+
     return version
 
 # booleans about the state of the the PEP440 tags.
