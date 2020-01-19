@@ -525,6 +525,10 @@ def get_version(path):
         # this project doesn't seem to be versioneer/miniver controlled - maybe the
         # version is hardcoded? Interrogate meta.yaml
         version = version_from_meta_yaml(path)
+
+    if version is None:
+        raise ValueError('Unable to detect version using conda, versioneer or miniver')
+
     return version
 
 # booleans about the state of the the PEP440 tags.
