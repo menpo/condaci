@@ -172,10 +172,13 @@ def execute_sequence(*cmds, **kwargs):
 
 def download_file(url, path_to_download):
     try:
-        from urllib2 import urlopen
+        from urllib2 import urlopen, Request
     except ImportError:
-        from urllib.request import urlopen
-    f = urlopen(url)
+        from urllib.request import urlopen, Request
+    request = Request(url, headers={
+        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+    })
+    f = urlopen(request)
     with open(path_to_download, "wb") as fp:
         fp.write(f.read())
     fp.close()
@@ -197,7 +200,7 @@ def is_windows():
 
 def python_arch():
     # We care about the Python architecture, not the OS.
-    return 'x64' if sys.maxsize > 2**32 else 'x86'
+    return 'x64' if sys.maxsize > 2 ** 32 else 'x86'
 
 
 # ------------------------ MINICONDA INTEGRATION ---------------------------- #
@@ -530,6 +533,7 @@ def get_version(path):
         raise ValueError('Unable to detect version using conda, versioneer or miniver')
 
     return version
+
 
 # booleans about the state of the the PEP440 tags.
 is_tag = lambda v: '+' not in v
@@ -880,6 +884,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     from argparse import ArgumentParser
+
     pa = ArgumentParser(
         description=r"""
         Sets up miniconda, builds, and uploads to Binstar.
