@@ -742,14 +742,15 @@ def get_default_branch_from_github(user, repo_name):
 
 
 def branch_from_travis():
-    tag = os.environ['CIRCLE_TAG']
-    branch = os.environ['CIRCLE_BRANCH']
+    tag = os.environ['TRAVIS_TAG']
+    branch = os.environ['TRAVIS_BRANCH']
     if tag == branch:
-        print('WARNING - on circleci and CIRCLE_TAG == CIRCLE_BRANCH. This '
+        print('WARNING - on travis and TRAVIS_TAG == TRAVIS_BRANCH. This '
               'suggests that we are building a tag.')
         repo_slug = os.environ['TRAVIS_REPO_SLUG']
         user, repo_name = repo_slug.split('/')
         branch = get_default_branch_from_github(user, repo_name)
+        print('Detected a tag - building on default branch {}'.format(branch))
 
     assert branch
     return branch
@@ -762,6 +763,7 @@ def branch_from_circleci():
         assert os.environ['CIRCLE_TAG']
         branch = get_default_branch_from_github(os.environ['CIRCLE_PROJECT_USERNAME'],
                                                 os.environ['CIRCLE_PROJECT_REPONAME'])
+        print('Detected a tag - building on default branch {}'.format(branch))
 
     assert branch
     return branch
