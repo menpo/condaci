@@ -171,14 +171,7 @@ def execute_sequence(*cmds, **kwargs):
 
 
 def download_file(url, path_to_download):
-    try:
-        from urllib2 import urlopen, Request
-    except ImportError:
-        from urllib.request import urlopen, Request
-    request = Request(url, headers={
-        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
-    })
-    f = urlopen(request)
+    f = get_url(url)
     with open(path_to_download, "wb") as fp:
         fp.write(f.read())
     fp.close()
@@ -728,19 +721,50 @@ is_pr_from_appveyor = lambda: 'APPVEYOR_PULL_REQUEST_NUMBER' in os.environ
 branch_from_appveyor = lambda: os.environ['APPVEYOR_REPO_BRANCH']
 
 
+def get_url(url):
+    try:
+        from urllib2 import urlopen, Request
+    except ImportError:
+        from urllib.request import urlopen, Request
+    request = Request(url, headers={
+        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+    })
+    return urlopen(request)
+
+
+def get_default_branch_from_github(user, repo_name):
+    import json
+
+    url = "https://api.github.com/repos/{}/{}".format(user, repo_name)
+    response = get_url(url)
+    repo_data = json.loads(response.read().decode('utf-8'))
+    return repo_data['default_branch']
+
+
 def branch_from_travis():
     tag = os.environ['CIRCLE_TAG']
     branch = os.environ['CIRCLE_BRANCH']
     if tag == branch:
         print('WARNING - on circleci and CIRCLE_TAG == CIRCLE_BRANCH. This '
               'suggests that we are building a tag.')
-        return 'master'
-    else:
-        return branch
+        repo_slug = os.environ['TRAVIS_REPO_SLUG']
+        user, repo_name = repo_slug.split('/')
+        branch = get_default_branch_from_github(user, repo_name)
+
+    assert branch
+    return branch
 
 
 def branch_from_circleci():
-    return os.environ['CIRCLE_BRANCH']
+    branch = os.environ['CIRCLE_BRANCH']
+    if not branch:
+        # We are on a tag and we need to work out what the default
+        assert os.environ['CIRCLE_TAG']
+        branch = get_default_branch_from_github(os.environ['CIRCLE_PROJECT_USERNAME'],
+                                                os.environ['CIRCLE_PROJECT_REPONAME'])
+
+    assert branch
+    return branch
 
 
 def travis_build_is_duplicate():
