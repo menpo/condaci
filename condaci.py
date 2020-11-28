@@ -236,6 +236,9 @@ def travis_miniconda_dir():
     return p.expanduser('~/miniconda')
 
 
+circleci_miniconda_dir = travis_miniconda_dir
+
+
 def temp_installer_path():
     # we need a place to download the miniconda installer to. use a random
     # string for the filename to avoid collisions, but choose the dir based
@@ -250,6 +253,11 @@ def miniconda_dir():
         path = appveyor_miniconda_dir()
     elif is_on_travis():
         path = travis_miniconda_dir()
+    elif is_on_circleci():
+        path = circleci_miniconda_dir()
+    else:
+        assert False, "Unknown CI"
+
     return path
 
 
