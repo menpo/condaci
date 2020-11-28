@@ -11,7 +11,6 @@ import uuid
 import sys
 from pprint import pprint
 
-
 VS9_PY_VERS = ['2.7']
 VS10_PY_VERS = ['3.3', '3.4']
 VS14_PY_VERS = ['3.5', '3.6', '3.7', '3.8', '3.9']
@@ -53,7 +52,7 @@ def set_globals_from_environ(verbose=True):
     global PYTHON_VERSION, BINSTAR_KEY, BINSTAR_USER, PYTHON_VERSION_NO_DOT
     global PYPI_USER, PYPI_PASSWORD, PYPI_TEST_USER, PYPI_TEST_PASSWORD, ARCH
 
-    if not (is_on_appveyor() or is_on_travis()):
+    if not (is_on_appveyor() or is_on_travis() or is_on_circleci()):
         raise ValueError('FATAL: Unknown CI system.')
 
     PYTHON_VERSION = os.environ.get('PYTHON_VERSION')
@@ -79,13 +78,13 @@ def set_globals_from_environ(verbose=True):
         print('  ARCH:               {} - ({})'.format(ARCH, arch_origin))
         print('  BINSTAR_USER:       {}'.format(BINSTAR_USER))
         print('  BINSTAR_KEY:        {}'.format('*****' if BINSTAR_KEY
-                                                is not None else '-'))
+                                                           is not None else '-'))
         print('  PYPI_USER:          {}'.format(PYPI_USER))
         print('  PYPI_PASSWORD:      {}'.format('*****' if PYPI_PASSWORD
-                                                is not None else '-'))
+                                                           is not None else '-'))
         print('  PYPI_TEST_USER:     {}'.format(PYPI_TEST_USER))
         print('  PYPI_TEST_PASSWORD: {}'.format('*****' if PYPI_TEST_PASSWORD
-                                                is not None else '-'))
+                                                           is not None else '-'))
 
     if PYTHON_VERSION is None:
         raise ValueError('FATAL: PYTHON_VERSION is not set.')
@@ -382,7 +381,7 @@ def windows_setup_compiler():
                 VCVARS64_PATH))
         else:
             print("Copying '{}' to '{}' to fix VS2008 64-bit configuration.".format(
-                      VCVARS64_PATH, VCVARSAMD64_PATH))
+                VCVARS64_PATH, VCVARSAMD64_PATH))
             shutil.copyfile(VCVARS64_PATH, VCVARSAMD64_PATH)
     # Python 3.3 or 3.4
     elif PYTHON_VERSION in VS10_PY_VERS and ARCH == 'x64':
@@ -711,31 +710,35 @@ def binstar_upload_and_purge(mc, key, user, channel, filepath):
 
 is_on_appveyor = lambda: 'APPVEYOR' in os.environ
 is_on_travis = lambda: 'TRAVIS' in os.environ
+is_on_circleci = lambda: 'CIRCLECI' in os.environ
 
 is_pr_from_travis = lambda: os.environ['TRAVIS_PULL_REQUEST'] != 'false'
+is_pr_from_circlei = lambda: 'CIRCLE_PULL_REQUEST' in os.environ
 is_pr_from_appveyor = lambda: 'APPVEYOR_PULL_REQUEST_NUMBER' in os.environ
 
 branch_from_appveyor = lambda: os.environ['APPVEYOR_REPO_BRANCH']
 
 
 def branch_from_travis():
-    tag = os.environ['TRAVIS_TAG']
-    branch = os.environ['TRAVIS_BRANCH']
+    tag = os.environ['CIRCLE_TAG']
+    branch = os.environ['CIRCLE_BRANCH']
     if tag == branch:
-        print('WARNING - on travis and TRAVIS_TAG == TRAVIS_BRANCH. This '
+        print('WARNING - on circleci and CIRCLE_TAG == CIRCLE_BRANCH. This '
               'suggests that we are building a tag.')
-        print('Travis obscures the branch in this scenario, so we assume that'
-              ' the branch is "master"')
         return 'master'
     else:
         return branch
 
 
+def branch_from_circleci():
+    tag = os.environ['CIRCLE_TAG']
+    branch = os.environ['CIRCLE_BRANCH']
+    return branch
+
+
 def travis_build_is_duplicate():
     tag = os.environ['TRAVIS_TAG']
     branch = os.environ['TRAVIS_BRANCH']
-    print(tag)
-    print(branch)
     # Travis will kick off two builds for tags - a build specifically for the tag, *and*
     # a normal build for the branch. This means we do the same work twice, which leads to
     # failures with uploads. Detect one of the two conditions here so we can bail.
@@ -747,8 +750,10 @@ def is_pr_on_ci():
         return is_pr_from_travis()
     elif is_on_appveyor():
         return is_pr_from_appveyor()
+    elif is_on_circleci():
+        return is_pr_from_circlei()
     else:
-        raise ValueError("Not on appveyor or travis, so can't "
+        raise ValueError("Not on appveyor, travis or CircleCI, so can't "
                          "resolve whether we are on a PR or not")
 
 
@@ -757,8 +762,10 @@ def branch_from_ci():
         return branch_from_travis()
     elif is_on_appveyor():
         return branch_from_appveyor()
+    elif is_on_circleci():
+        return branch_from_circleci()
     else:
-        raise ValueError("We aren't on Appveyor or Travis so can't "
+        raise ValueError("We aren't on Appveyor, Travis or CircleCI so can't "
                          "decide on branch")
 
 
@@ -784,7 +791,7 @@ def binstar_channel_from_ci(path):
 
 # -------------------- PYPI INTEGRATION ---------------------- #
 
-PYPI_SDIST_UPLOAD_PYTHON_VERSION = os.environ.get('CONDACI_PYPI_SDIST_UPLOAD_PY_VER', '3.5')
+PYPI_SDIST_UPLOAD_PYTHON_VERSION = os.environ.get('CONDACI_PYPI_SDIST_UPLOAD_PY_VER', '3.6')
 pypirc_path = lambda: p.join(p.expanduser('~'), '.pypirc')
 pypi_sdist_upload_allowed = lambda: (host_platform() == 'Linux' and
                                      PYTHON_VERSION ==
