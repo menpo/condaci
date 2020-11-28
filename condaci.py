@@ -74,17 +74,18 @@ def set_globals_from_environ(verbose=True):
 
     if verbose:
         print('Environment variables extracted:')
-        print('  PYTHON_VERSION:     {}'.format(PYTHON_VERSION))
-        print('  ARCH:               {} - ({})'.format(ARCH, arch_origin))
-        print('  BINSTAR_USER:       {}'.format(BINSTAR_USER))
-        print('  BINSTAR_KEY:        {}'.format('*****' if BINSTAR_KEY
-                                                           is not None else '-'))
-        print('  PYPI_USER:          {}'.format(PYPI_USER))
-        print('  PYPI_PASSWORD:      {}'.format('*****' if PYPI_PASSWORD
-                                                           is not None else '-'))
-        print('  PYPI_TEST_USER:     {}'.format(PYPI_TEST_USER))
-        print('  PYPI_TEST_PASSWORD: {}'.format('*****' if PYPI_TEST_PASSWORD
-                                                           is not None else '-'))
+        print('  PYTHON_VERSION:                    {}'.format(PYTHON_VERSION))
+        print('  ARCH:                              {} - ({})'.format(ARCH, arch_origin))
+        print('  BINSTAR_USER:                      {}'.format(BINSTAR_USER))
+        print('  BINSTAR_KEY:                       {}'.format('*****' if BINSTAR_KEY
+                                                                          is not None else '-'))
+        print('  PYPI_USER:                         {}'.format(PYPI_USER))
+        print('  PYPI_PASSWORD:                     {}'.format('*****' if PYPI_PASSWORD
+                                                                          is not None else '-'))
+        print('  PYPI_TEST_USER:                    {}'.format(PYPI_TEST_USER))
+        print('  PYPI_TEST_PASSWORD:                {}'.format('*****' if PYPI_TEST_PASSWORD
+                                                                          is not None else '-'))
+        print('  PYPI_SDIST_UPLOAD_PYTHON_VERSION:  {}'.format(PYPI_SDIST_UPLOAD_PYTHON_VERSION))
 
     if PYTHON_VERSION is None:
         raise ValueError('FATAL: PYTHON_VERSION is not set.')
