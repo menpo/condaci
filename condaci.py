@@ -420,13 +420,6 @@ def build_conda_package(mc, path, binstar_user=None):
                      binstar_user + '/channel/master'])
     else:
         print('building a RC or tag release - no master channel added.')
-        print('Checking to see if this build is a duplicate...')
-        if is_on_travis() and travis_build_is_duplicate():
-            print('On travis and this is a duplicate build of a tag - '
-                  'travis will have also kicked off a build for the branch '
-                  'with this tag on it.')
-            print('Exiting this build now.')
-            sys.exit(0)
 
     for key in SECRET_ENVS:
         if key in os.environ:
@@ -769,6 +762,11 @@ def branch_from_circleci():
     return branch
 
 
+def circleci_build_is_tag():
+    tag = os.environ.get('CIRCLE_TAG')
+    return tag is not None
+
+
 def travis_build_is_duplicate():
     tag = os.environ['TRAVIS_TAG']
     branch = os.environ['TRAVIS_BRANCH']
@@ -867,6 +865,17 @@ def upload_to_pypi_if_appropriate(mc, path, username, password,
     if not pypi_sdist_upload_allowed():
         print('Not on key node (Linux Python {}) - no PyPI sdist upload'
               .format(PYPI_SDIST_UPLOAD_PYTHON_VERSION))
+        return
+
+    if is_on_travis() and travis_build_is_duplicate():
+        print('On travis and this is a duplicate build of a tag - '
+              'travis will have also kicked off a build for the branch '
+              'with this tag on it.')
+        print('Not uploading to PyPi')
+        return
+
+    if is_on_circleci() and circleci_build_is_tag():
+        print('On CircleCI and this is not a tag build - not uploading to Pypi')
         return
 
     sdist_dir = p.join(get_dirty_work_dir(mc), 'dist/*')
