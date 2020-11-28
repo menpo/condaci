@@ -874,7 +874,7 @@ def upload_to_pypi_if_appropriate(mc, path, username, password,
         print('Not uploading to PyPi')
         return
 
-    if is_on_circleci() and circleci_build_is_tag():
+    if is_on_circleci() and not circleci_build_is_tag():
         print('On CircleCI and this is not a tag build - not uploading to Pypi')
         return
 
