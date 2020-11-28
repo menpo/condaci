@@ -740,9 +740,7 @@ def branch_from_travis():
 
 
 def branch_from_circleci():
-    tag = os.environ['CIRCLE_TAG']
-    branch = os.environ['CIRCLE_BRANCH']
-    return branch
+    return os.environ['CIRCLE_BRANCH']
 
 
 def travis_build_is_duplicate():
