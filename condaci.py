@@ -315,7 +315,7 @@ def setup_miniconda(installation_path, binstar_user=None, extra_channels=None):
         # delete the installer now we are done
         os.unlink(temp_installer_path())
     cmds = [[conda_cmd, 'update', '-q', '--yes', 'conda'],
-            [conda_cmd, 'install', '-q', '--yes', 'conda-build==3.20.5', 'conda-verify',
+            [conda_cmd, 'install', '-q', '--yes', 'conda-build==3.21.7', 'conda-verify',
              'jinja2', 'ripgrep', 'anaconda-client', 'twine']]
     root_config = os.path.join(installation_path, '.condarc')
     if os.path.exists(root_config):
